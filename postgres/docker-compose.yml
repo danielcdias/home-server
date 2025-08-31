@@ -1,0 +1,14 @@
+services:
+  postgres:
+    image: bitnami/postgresql:17.6.0-debian-12-r4
+    container_name: postgres
+    restart: unless-stopped
+    ports:
+      - "5432:5432"
+    env_file:
+      - .env
+    volumes:
+      - postgres-data:/bitnami/postgresql
+
+volumes:
+  postgres-data:
