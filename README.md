@@ -13,6 +13,7 @@ The project currently includes configurations for the following services:
 * **[Home Assistant](https://www.home-assistant.io/):** A powerful open-source home automation platform for local control of smart devices.
 * **[Pi-Hole](https://pi-hole.net/):** A network-wide ad and tracker blocking DNS server.
 * **[PostgreSQL](https://www.postgresql.org/):** A robust relational database for data storage.
+* **[nginx](https://nginx.org/):** A high-performance web server, reverse proxy, and load balancer.
 
 **Future services:** The modular design allows for the easy addition of other services, such as media servers, file storage, and more.
 
@@ -50,13 +51,13 @@ To get started with this project, you need to have the following software instal
 
 To ensure your services start automatically on system boot, you can use `systemd`.
 
-1.  Copy the `home-server.service` file to the `systemd` configuration folder:
+1.  Copy the `homeserver.service` file to the `systemd` configuration folder:
 
     ```bash
-    sudo cp home-server.service /etc/systemd/system/
+    sudo cp homeserver.service /etc/systemd/system/
     ```
 
-2.  Adjust the `WorkingDirectory` line in the `/etc/systemd/system/home-server.service` file to your project's correct path. If you cloned it to `/home/daniel/home-server`, the path should be:
+2.  Adjust the `WorkingDirectory` line in the `/etc/systemd/system/homeserver.service` file to your project's correct path. If you cloned it to `/home/daniel/home-server`, the path should be:
 
     ```ini
     WorkingDirectory=/home/daniel/home-server
@@ -66,13 +67,13 @@ To ensure your services start automatically on system boot, you can use `systemd
 
     ```bash
     sudo systemctl daemon-reload
-    sudo systemctl enable home-server.service
+    sudo systemctl enable homeserver.service
     ```
 
 4.  To start the service immediately, run:
 
     ```bash
-    sudo systemctl start home-server.service
+    sudo systemctl start homeserver.service
     ```
 
 ---

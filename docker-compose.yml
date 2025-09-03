@@ -1,4 +1,5 @@
 services:
+
   postgres:
     build:
       context: ./postgres
@@ -9,7 +10,7 @@ services:
     env_file:
       - .env
     volumes:
-      - postgres-data:/bitnami/postgresql
+      - postgres_data:/var/lib/postgresql/data
       - ./postgres/init.sh:/docker-entrypoint-initdb.d/init.sh
       - ./postgres/config/:/docker-entrypoint-initdb.d/config/
     networks:
@@ -21,6 +22,7 @@ services:
       timeout: 5s
       retries: 5
       start_period: 30s
+
   pihole:
     container_name: pihole
     image: pihole/pihole:latest
@@ -30,9 +32,9 @@ services:
     env_file:
       - .env
     environment:
-      TZ: ${TZ}
-      FTLCONF_webserver_api_password: ${PIHOLE_WEB_PASSWORD}
-      FTLCONF_dns_listeningMode: '${FTLCONF_DNS_LISTENING_MODE}'
+      TZ: ${TZ:-America/Sao_Paulo}
+      FTLCONF_webserver_api_password: ${PIHOLE_WEB_PASSWORD:-changeme}
+      FTLCONF_dns_listeningMode: '${FTLCONF_DNS_LISTENING_MODE:-all}'
     volumes:
       - ./etc-pihole:/etc/pihole
     networks:
@@ -44,17 +46,18 @@ services:
       timeout: 10s
       retries: 10
       start_period: 15s
+
   homeassistant:
     image: ghcr.io/home-assistant/home-assistant:stable
     container_name: homeassistant
     entrypoint: ["/bin/bash", "/docker-entrypoint.sh"]
     volumes:
-      - ${HA_CONFIG_DIR}:/config
-      - ${HA_ENTRYPOINT_SCRIPT}:/docker-entrypoint.sh
+      - ./home-assistant/config:/config
+      - ./home-assistant/docker-entrypoint.sh:/docker-entrypoint.sh
     env_file:
       - .env
     environment:
-      - HA_TZ=${TZ}
+      - HA_TZ=${TZ:-America/Sao_Paulo}
       - DATABASE_URL=postgresql://${HA_POSTGRES_USER}:${HA_POSTGRES_PASSWORD}@postgres:5432/${HA_POSTGRES_DB_NAME}
     networks:
       - internal_db
@@ -69,6 +72,7 @@ services:
       timeout: 10s
       retries: 10
       start_period: 120s
+
   nginx:
     container_name: nginx
     image: nginx:latest
@@ -91,8 +95,10 @@ services:
       timeout: 10s
       retries: 10
       start_period: 40s
+
 volumes:
   postgres-data:
+
 networks:
   internal_db:
   public_web:

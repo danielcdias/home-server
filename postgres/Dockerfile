@@ -1,4 +1,4 @@
-FROM bitnami/postgresql:17.6.0-debian-12-r4
+FROM postgres:17.6-alpine3.21
 
 USER root
 RUN apt-get update && \

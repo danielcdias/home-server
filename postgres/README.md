@@ -2,7 +2,7 @@
 
 ## Overview
 
-This folder contains the Docker Compose configuration for the PostgreSQL database service. This database is intended to be used by other services on your home server, such as Home Assistant and Speedtest-Tracker.
+This folder contains the configuration for the PostgreSQL database service. This database is intended to be used by other services on your home server, such as Home Assistant and Speedtest-Tracker.
 
 ## Configuration
 

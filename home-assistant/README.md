@@ -2,7 +2,7 @@
 
 ## Overview
 
-This folder contains the Docker Compose configuration for the Home Assistant service. Home Assistant is an open-source home automation platform that puts local control and privacy first.
+This folder contains the configuration for the Home Assistant service. Home Assistant is an open-source home automation platform that puts local control and privacy first.
 
 This setup is configured to connect to an external PostgreSQL database and uses a custom entrypoint script to automatically install the Home Assistant Community Store (HACS) on the first run.
 
@@ -20,11 +20,8 @@ Before starting the container, edit the `.env` file in the root of the project t
 | Variable | Description | Example |
 | :--- | :--- | :--- |
 | `TZ` | The timezone for the container. | `America/Sao_Paulo` |
-| `HA_CONFIG_DIR` | The local path for Home Assistant's configuration files. | `./config` |
-| `HA_ENTRYPOINT_SCRIPT` | The local path for the entrypoint script. | `./docker-entrypoint.sh` |
 | `POSTGRES_USER` | The PostgreSQL database user. | `ha_user` |
 | `POSTGRES_PASSWORD` | The password for the PostgreSQL user. | `a-strong-password` |
-| `POSTGRES_DB_HOST` | The Docker container name of the PostgreSQL service. | `my_postgres_service` |
 | `POSTGRES_DB_NAME` | The name of the database to use. | `homeassistant` |
 
 ## Notes

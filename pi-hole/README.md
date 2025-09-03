@@ -2,7 +2,7 @@
 
 ## Overview
 
-This folder contains the Docker Compose configuration for running Pi-Hole as a DNS server. Pi-Hole acts as a network-wide ad blocker, protecting all devices on your home network.
+This folder contains the configuration for running Pi-Hole as a DNS server. Pi-Hole acts as a network-wide ad blocker, protecting all devices on your home network.
 
 The setup is configured to expose the necessary DNS ports and a web interface for managing the service.
 
