@@ -15,7 +15,7 @@ This setup is configured to connect to an external PostgreSQL database and uses 
 
 ## Configuration
 
-Before starting the container, create a `.env` file in this folder with the following variables.
+Before starting the container, edit the `.env` file in the root of the project to include the following variables.
 
 | Variable | Description | Example |
 | :--- | :--- | :--- |
@@ -26,16 +26,6 @@ Before starting the container, create a `.env` file in this folder with the foll
 | `POSTGRES_PASSWORD` | The password for the PostgreSQL user. | `a-strong-password` |
 | `POSTGRES_DB_HOST` | The Docker container name of the PostgreSQL service. | `my_postgres_service` |
 | `POSTGRES_DB_NAME` | The name of the database to use. | `homeassistant` |
-
-## Deployment
-
-1.  Make sure you have created the `homelab_network` and your PostgreSQL service is connected to it.
-2.  The `docker-entrypoint.sh` script is already included in this repository.
-3.  Run the following command from this folder to start the service:
-
-    ```bash
-    docker-compose up -d
-    ```
 
 ## Notes
 

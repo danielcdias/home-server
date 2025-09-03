@@ -1,0 +1,98 @@
+services:
+  postgres:
+    build:
+      context: ./postgres
+      dockerfile: Dockerfile
+    container_name: postgres
+    ports:
+      - "5432:5432"
+    env_file:
+      - .env
+    volumes:
+      - postgres-data:/bitnami/postgresql
+      - ./postgres/init.sh:/docker-entrypoint-initdb.d/init.sh
+      - ./postgres/config/:/docker-entrypoint-initdb.d/config/
+    networks:
+      - internal_db
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+  pihole:
+    container_name: pihole
+    image: pihole/pihole:latest
+    ports:
+      - "53:53/tcp"
+      - "53:53/udp"
+    env_file:
+      - .env
+    environment:
+      TZ: ${TZ}
+      FTLCONF_webserver_api_password: ${PIHOLE_WEB_PASSWORD}
+      FTLCONF_dns_listeningMode: '${FTLCONF_DNS_LISTENING_MODE}'
+    volumes:
+      - ./etc-pihole:/etc/pihole
+    networks:
+      - public_web
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "dig", "+norecurse", "+retry=0", "@127.0.0.1", "pi.hole", "||", "exit", "1"]
+      interval: 30s
+      timeout: 10s
+      retries: 10
+      start_period: 15s
+  homeassistant:
+    image: ghcr.io/home-assistant/home-assistant:stable
+    container_name: homeassistant
+    entrypoint: ["/bin/bash", "/docker-entrypoint.sh"]
+    volumes:
+      - ${HA_CONFIG_DIR}:/config
+      - ${HA_ENTRYPOINT_SCRIPT}:/docker-entrypoint.sh
+    env_file:
+      - .env
+    environment:
+      - HA_TZ=${TZ}
+      - DATABASE_URL=postgresql://${HA_POSTGRES_USER}:${HA_POSTGRES_PASSWORD}@postgres:5432/${HA_POSTGRES_DB_NAME}
+    networks:
+      - internal_db
+      - public_web
+    restart: always
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "http://localhost:8123/"]
+      interval: 30s
+      timeout: 10s
+      retries: 10
+      start_period: 120s
+  nginx:
+    container_name: nginx
+    image: nginx:latest
+    restart: always
+    ports:
+      - "80:80"
+    volumes:
+      - ./nginx/reverse-proxy.conf:/etc/nginx/conf.d/reverse-proxy.conf:ro
+      - /dev/null:/etc/nginx/conf.d/default.conf
+    networks:
+      - public_web
+    depends_on:
+      pihole:
+        condition: service_healthy
+      homeassistant:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost"]
+      interval: 30s
+      timeout: 10s
+      retries: 10
+      start_period: 40s
+volumes:
+  postgres-data:
+networks:
+  internal_db:
+  public_web:
