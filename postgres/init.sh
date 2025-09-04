@@ -30,6 +30,10 @@ for row in $(echo "${config_json}" | jq -r '.[] | @base64'); do
 
         echo "Concedendo privilégios em $DB_NAME para $DB_USER"
         psql -v ON_ERROR_STOP=1 -U "$POSTGRES_USER" -d "$DB_NAME" -c "GRANT ALL PRIVILEGES ON DATABASE \"$DB_NAME\" TO \"$DB_USER\";"
+
+        # Adicione esta linha para alterar a propriedade
+        echo "Alterando a propriedade do banco de dados '$DB_NAME' para '$DB_USER'"
+        psql -v ON_ERROR_STOP=1 -U "$POSTGRES_USER" -d "$DB_NAME" -c "ALTER DATABASE \"$DB_NAME\" OWNER TO \"$DB_USER\";"
     else
         echo "Banco de dados '$DB_NAME' já existe. Ignorando a criação."
     fi
