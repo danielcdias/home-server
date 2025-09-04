@@ -2,13 +2,6 @@
 
 set -e
 
-# Aguarda o banco de dados estar pronto
-until pg_isready -h localhost -p 5432 -U ${POSTGRES_USER}
-do
-  echo "Aguardando o banco de dados..."
-  sleep 2
-done
-
 echo "Banco de dados pronto. Criando bancos de dados e usuários..."
 
 # Exporta a variável de ambiente PGPASSWORD
