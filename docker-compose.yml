@@ -97,7 +97,7 @@ services:
       start_period: 40s
 
 volumes:
-  postgres-data:
+  postgres_data:
 
 networks:
   internal_db:
