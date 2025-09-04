@@ -8,3 +8,6 @@ http:
   trusted_proxies:
     - 0.0.0.0/0
   login_attempts_threshold: 3
+
+recorder:
+  db_url: !env_var HA_DB_URL
