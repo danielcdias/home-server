@@ -90,7 +90,7 @@ services:
       public_web:
         ipv4_address: 172.20.0.30
     healthcheck:
-      test: ["CMD", "curl", "--fail", "http://localhost:9000/api/status"]
+      test: ["CMD-SHELL", "wget --spider http://localhost:9000/api/status || exit 1"]
       interval: 30s
       timeout: 10s
       retries: 5
