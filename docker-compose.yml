@@ -77,6 +77,25 @@ services:
       retries: 10
       start_period: 120s
 
+  portainer:
+    container_name: portainer
+    image: portainer/portainer-ce:latest
+    ports:
+      - "9000:9000"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - portainer_data:/data
+    restart: always
+    networks:
+      public_web:
+        ipv4_address: 172.20.0.30
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "http://localhost:9000/api/status"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 15s
+
   nginx:
     container_name: nginx
     image: nginx:latest
@@ -94,6 +113,8 @@ services:
         condition: service_healthy
       homeassistant:
         condition: service_healthy
+      portainer:
+        condition: service_healthy
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost"]
       interval: 30s
@@ -103,6 +124,7 @@ services:
 
 volumes:
   postgres_data:
+  portainer_data:
 
 networks:
   internal_db:
