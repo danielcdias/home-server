@@ -2,3 +2,5 @@
 **/*.log
 **/README.md
 **/LICENSE
+.dockerignore
+Dockerfile

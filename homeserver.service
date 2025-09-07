@@ -8,8 +8,8 @@ After=docker.service
 Type=oneshot
 RemainAfterExit=yes
 WorkingDirectory=/home/daniel/home-server
-ExecStart=/usr/local/bin/docker compose up -d
-ExecStop=/usr/local/bin/docker compose down
+ExecStart=/home/daniel/home-server/start-service.sh
+ExecStop=/home/daniel/home-server/stop-service.sh
 TimeoutStartSec=0
 
 [Install]

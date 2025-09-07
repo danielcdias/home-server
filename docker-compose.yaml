@@ -1,18 +1,74 @@
+name: home-server
 services:
 
+  komodo-mongo:
+    container_name: komodo-mongo
+    image: mongo
+    labels:
+      komodo.skip:
+    command: --quiet --wiredTigerCacheSizeGB 0.25
+    restart: unless-stopped
+    volumes:
+      - mongo-data:/data/db
+      - mongo-config:/data/configdb
+    env_file: ./komodo/compose.env
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: ${KOMODO_DB_USERNAME:-komodo}
+      MONGO_INITDB_ROOT_PASSWORD: ${KOMODO_DB_PASSWORD:-komodo}
+    networks:
+      - internal_komodo
+  
+  komodo-core:
+    container_name: komodo-core
+    image: ghcr.io/moghtech/komodo-core:${COMPOSE_KOMODO_IMAGE_TAG:-latest}
+    labels:
+      komodo.skip:
+    restart: unless-stopped
+    depends_on:
+      - komodo-mongo
+    env_file: ./komodo/compose.env
+    environment:
+      KOMODO_DATABASE_ADDRESS: komodo-mongo:27017
+      KOMODO_DATABASE_USERNAME: ${KOMODO_DB_USERNAME:-komodo}
+      KOMODO_DATABASE_PASSWORD: ${KOMODO_DB_PASSWORD:-komodo}
+    volumes:
+      - ${COMPOSE_KOMODO_BACKUPS_PATH:-/etc/komodo/backups}:/backups
+    networks:
+      internal_komodo:
+      public_web:
+        ipv4_address: 172.20.0.10
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "http://localhost:9120"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 20s      
+
+  komodo-periphery:
+    container_name: komodo-periphery
+    image: ghcr.io/moghtech/komodo-periphery:${COMPOSE_KOMODO_IMAGE_TAG:-latest}
+    labels:
+      komodo.skip:
+    restart: unless-stopped
+    env_file: ./komodo/compose.env
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - /proc:/proc
+      - ${PERIPHERY_ROOT_DIRECTORY:-/etc/komodo}:${PERIPHERY_ROOT_DIRECTORY:-/etc/komodo}
+    networks:
+      - internal_komodo
+
   postgres:
+    container_name: postgres
     build:
       context: ./postgres
       dockerfile: Dockerfile
-    container_name: postgres
     ports:
       - "5432:5432"
     env_file:
       - .env
     volumes:
       - postgres_data:/var/lib/postgresql/data
-      - ./postgres/init.sh:/docker-entrypoint-initdb.d/init.sh
-      - ./postgres/config/config.json:/docker-entrypoint-initdb.d/config/config.json
     networks:
       - internal_db
     restart: unless-stopped
@@ -41,7 +97,7 @@ services:
       - ./runtime_config/etc-pihole:/etc/pihole
     networks:
       public_web:
-        ipv4_address: 172.20.0.10
+        ipv4_address: 172.20.0.20
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "dig", "+norecurse", "+retry=0", "@127.0.0.1", "pi.hole", "||", "exit", "1"]
@@ -51,8 +107,8 @@ services:
       start_period: 15s
 
   homeassistant:
-    image: ghcr.io/home-assistant/home-assistant:stable
     container_name: homeassistant
+    image: ghcr.io/home-assistant/home-assistant:stable
     entrypoint: ["/bin/bash", "/docker-entrypoint.sh"]
     volumes:
       - ./home-assistant/config/configuration.yaml:/config/configuration.yaml
@@ -65,7 +121,7 @@ services:
     networks:
       internal_db:
       public_web:
-        ipv4_address: 172.20.0.20
+        ipv4_address: 172.20.0.30
     restart: always
     depends_on:
       postgres:
@@ -77,25 +133,6 @@ services:
       retries: 10
       start_period: 120s
 
-  portainer:
-    container_name: portainer
-    image: portainer/portainer-ce:2.33.1-alpine
-    ports:
-      - "9000:9000"
-    volumes:
-      - /var/run/docker.sock:/var/run/docker.sock
-      - portainer_data:/data
-    restart: always
-    networks:
-      public_web:
-        ipv4_address: 172.20.0.30
-    healthcheck:
-      test: ["CMD-SHELL", "wget --spider http://localhost:9000/api/status || exit 1"]
-      interval: 30s
-      timeout: 10s
-      retries: 5
-      start_period: 15s
-
   nginx:
     container_name: nginx
     image: nginx:latest
@@ -104,6 +141,7 @@ services:
       - "80:80"
     volumes:
       - ./nginx/reverse-proxy.conf:/etc/nginx/conf.d/reverse-proxy.conf:ro
+      - ./nginx/html:/var/www/html:ro
       - /dev/null:/etc/nginx/conf.d/default.conf
     networks:
       public_web:
@@ -113,7 +151,7 @@ services:
         condition: service_healthy
       homeassistant:
         condition: service_healthy
-      portainer:
+      komodo-core:
         condition: service_healthy
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost"]
@@ -123,8 +161,9 @@ services:
       start_period: 40s
 
 volumes:
+  mongo-data:
+  mongo-config:
   postgres_data:
-  portainer_data:
 
 networks:
   internal_db:
@@ -133,3 +172,4 @@ networks:
     ipam:
       config:
         - subnet: 172.20.0.0/24
+  internal_komodo:
