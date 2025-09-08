@@ -120,16 +120,49 @@ configure_webmin() {
         cp "$WEBMIN_CONFIG_DIR/miniserv.conf" "$WEBMIN_CONFIG_DIR/miniserv.conf.backup_$backup_timestamp"
     fi
     
-    # Configurar /etc/webmin/config
-    cat > "$WEBMIN_CONFIG_DIR/config" << EOF
-allow=$WEBMIN_ALLOW_NETWORKS
-referers=webmin.homeserver
-noreferers=*
-ssl_redirect=0
-no_ssl_redirect=1
-EOF
+    # Configurar /etc/webmin/config - MODIFICAÇÃO APENAS DAS CONFIGURAÇÕES NECESSÁRIAS
+    if [[ -f "$WEBMIN_CONFIG_DIR/config" ]]; then
+        # Atualizar ou adicionar configurações específicas
+        if ! grep -q "^allow=" "$WEBMIN_CONFIG_DIR/config"; then
+            echo "allow=$WEBMIN_ALLOW_NETWORKS" >> "$WEBMIN_CONFIG_DIR/config"
+        else
+            sed -i "s/^allow=.*/allow=$WEBMIN_ALLOW_NETWORKS/" "$WEBMIN_CONFIG_DIR/config"
+        fi
+        
+        if ! grep -q "^referers=" "$WEBMIN_CONFIG_DIR/config"; then
+            echo "referers=webmin.homeserver" >> "$WEBMIN_CONFIG_DIR/config"
+        else
+            sed -i "s/^referers=.*/referers=webmin.homeserver/" "$WEBMIN_CONFIG_DIR/config"
+        fi
+        
+        if ! grep -q "^noreferers=" "$WEBMIN_CONFIG_DIR/config"; then
+            echo "noreferers=*" >> "$WEBMIN_CONFIG_DIR/config"
+        else
+            sed -i "s/^noreferers=.*/noreferers=*/" "$WEBMIN_CONFIG_DIR/config"
+        fi
+        
+        if ! grep -q "^ssl_redirect=" "$WEBMIN_CONFIG_DIR/config"; then
+            echo "ssl_redirect=0" >> "$WEBMIN_CONFIG_DIR/config"
+        else
+            sed -i "s/^ssl_redirect=.*/ssl_redirect=0/" "$WEBMIN_CONFIG_DIR/config"
+        fi
+        
+        if ! grep -q "^no_ssl_redirect=" "$WEBMIN_CONFIG_DIR/config"; then
+            echo "no_ssl_redirect=1" >> "$WEBMIN_CONFIG_DIR/config"
+        else
+            sed -i "s/^no_ssl_redirect=.*/no_ssl_redirect=1/" "$WEBMIN_CONFIG_DIR/config"
+        fi
+        
+        # Remover configurações conflitantes se existirem
+        sed -i '/^webprefix=/d' "$WEBMIN_CONFIG_DIR/config"
+        sed -i '/^relative_links=/d' "$WEBMIN_CONFIG_DIR/config"
+        
+    else
+        log_error "Arquivo config não encontrado!"
+        return 1
+    fi
     
-    # Configurar /etc/webmin/miniserv.conf
+    # Configurar /etc/webmin/miniserv.conf (já está correto)
     if [[ -f "$WEBMIN_CONFIG_DIR/miniserv.conf" ]]; then
         # Remover configurações SSL problemáticas
         sed -i '/^ssl=/d' "$WEBMIN_CONFIG_DIR/miniserv.conf"
