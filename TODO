@@ -1,3 +1,5 @@
-- Verificar porque home-server.service não está funcionando
-- Verificar forwards no nginx
-- Ver ferramenta de autocompletar para linux
+- Adicionar o README do Komodo e corrigir os demais.
+- Verificar problema no Komodo.
+- Testar Webmin no nginx.
+- Verificar problema de acesso ao pihole no nginx.
+- Testar Home Assistant no nginx.

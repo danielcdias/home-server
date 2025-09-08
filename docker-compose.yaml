@@ -92,7 +92,7 @@ services:
       FTLCONF_webserver_api_password: ${PIHOLE_WEB_PASSWORD:-changeme}
       FTLCONF_dns_listeningMode: 'all'
       FTLCONF_misc_etc_dnsmasq_d: 'true'
-      FTLCONF_misc_dnsmasq_lines: "address=/home-server/172.20.0.100"
+      FTLCONF_misc_dnsmasq_lines: "address=/homeserver/172.20.0.100"
     volumes:
       - ./runtime_config/etc-pihole:/etc/pihole
     networks:
@@ -139,9 +139,11 @@ services:
     restart: always
     ports:
       - "80:80"
+      - "443:443"
     volumes:
       - ./nginx/reverse-proxy.conf:/etc/nginx/conf.d/reverse-proxy.conf:ro
       - ./nginx/html:/var/www/html:ro
+      - ./nginx/ssl:/etc/nginx/ssl:ro
       - /dev/null:/etc/nginx/conf.d/default.conf
     networks:
       public_web:
