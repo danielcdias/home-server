@@ -10,14 +10,29 @@ By using a single `docker-compose.yml` file, all services and their dependencies
 
 The project currently includes configurations for the following services:
 
-* **[Home Assistant](https://www.home-assistant.io/):** A powerful open-source home automation platform for local control of smart devices.
+* **[PostgreSQL](https://www.postgresql.org/):** A robust relational database for data storage. It's used by Home Assistant and can be used by any other service or customized application you build.
+* **[nginx](https://nginx.org/):** A high-performance web server, reverse proxy, and load balancer. The main role of nginx is to provide forwarding from any web interface the services may have to a subdomain, ensuring all services use HTTPS when accessed.
 * **[Pi-Hole](https://pi-hole.net/):** A network-wide ad and tracker blocking DNS server.
-* **[PostgreSQL](https://www.postgresql.org/):** A robust relational database for data storage.
-* **[nginx](https://nginx.org/):** A high-performance web server, reverse proxy, and load balancer.
+* **[Home Assistant](https://www.home-assistant.io/):** A powerful open-source home automation platform for local control of smart devices.
+* **[Komodo](https://komo.do/):** A tool to provide structure for managing your servers, builds, deployments, and automated procedures.
+* **[Webmin](https://webmin.com/):** A system administration tool for Unix-like servers and services.
 
 **Future services:** The modular design allows for the easy addition of other services, such as media servers, file storage, and more.
 
----
+## Domain and Subdomains
+
+This project creates the domain `homeserver` and subdomains for all services that have a web interface:
+
+- `pihole.homeserver`: Pi-Hole
+- `ha.homeserver`: Home Assistant
+- `komodo.homeserver`: Komodo
+- `webmin.homeserver`: Webmin
+
+This mean that your server hostname should be `homeserver`. Or you can change this code to use the hostname you already have configured. In the future we plan to change the installation script to ask the hostname to be used.
+
+The setup also generates a self-signed certificate for the domain and subdomains, with a `ca.crt` file that can be added to your devices to make the HTTPS addresses recognized by browsers within your domestic network.
+
+All the services above are forwarded by nginx to their respective subdomains.
 
 ## Getting Started
 
@@ -27,6 +42,7 @@ To get started with this project, you need to have the following software instal
 
 * [**Docker**](https://docs.docker.com/get-docker/)
 * [**Docker Compose**](https://docs.docker.com/compose/install/)
+* [**Webmin**](https://webmin.com/download/)
 
 ### Installation and Deployment
 
@@ -37,47 +53,108 @@ To get started with this project, you need to have the following software instal
     cd home-server
     ```
 
-2.  Create the `.env` file in the project's root folder and configure the necessary environment variables. Check the `README.md` files within each service's subfolder for a list of required variables.
+2.  Create the `.env` file in the root folder with the following variables:
 
-3.  With the `.env` file configured, run the following command from the project's root directory to start the containers:
+| Variable | Description | Example |
+| :--- | :--- | :--- |
+| `TZ` | The [timezone code](https://en.wikipedia.org/wiki/List_of_tz_database_time_zones) for your country/area. | `America/Sao_Paulo` |
+| `POSTGRES_DB` | Database root db (usually postgres). | `postgres` |
+| `POSTGRES_USER` | Database root username. | `postgres` |
+| `POSTGRES_PASSWORD` | Database root password. | `a_strong_password` |
+| `PIHOLE_WEB_PASSWORD` | Password to access Pi-Hole's Web Admin page. | `a_strong_password` |
+| `HA_POSTGRES_USER` | Home Assistant Postgres username. | `homeassistant` |
+| `HA_POSTGRES_PASSWORD` | Home Assistant Postgres password. | `a_strong_password` |
+| `HA_POSTGRES_DB_NAME` | Home Assistant database name to be created in Postgres. | `home_assistant` |
+| `HA_DB_URL` | URL for Home Assistant access to Postgres database, using the variables defined above. | `postgresql://<username>:<password>@postgres/<db_name>` |
 
-    ```bash
-    docker compose up -d
-    ```
+3. Create the `./postgres/config/config.json` file with the databases to be created when PostgreSQL starts. For example, the Home Assistant database:
 
----
+```json
+[
+  {
+    "db_name": "home_assistant",
+    "user": "homeassistant",
+    "password": "a_strong_password"
+  }
+]
+```
+⚠️ **ATTENTION!** he database name, username, and password information for Home Assistant in the config.json file MUST BE THE SAME as defined in the `.env` file.
 
-## Automated Deployment with systemd
 
-To ensure your services start automatically on system boot, you can use `systemd`.
+4.  With both `.env` and `./postgres/config/config.json` files configured, run the `./install.sh` script with sudo, providing the complete path to the `home-server` project folder created in step 1 as an argument:
 
-1.  Copy the `homeserver.service` file to the `systemd` configuration folder:
+```bash
+sudo ./install.sh /home/johndoe/home-server
+```
 
-    ```bash
-    sudo cp homeserver.service /etc/systemd/system/
-    ```
+The `./install.sh` script will:
+- Check if prerequisites are installed, like Docker
+- Create a service in `systemctl` configuration named homeserver.service to automate startup
+- Configure Webmin to work being forwarded by nginx
+- Generate certificates for all domains and subdomains
 
-2.  Adjust the `WorkingDirectory` line in the `/etc/systemd/system/homeserver.service` file to your project's correct path. If you cloned it to `/home/daniel/home-server`, the path should be:
+5. After installation, you can reboot your system to check if the `homeserver.service` will start automatically,  or you can start it manually with:
 
-    ```ini
-    WorkingDirectory=/home/daniel/home-server
-    ```
+```bash
+cd\<project_folder>
+sudo docker compose up -d
+```
 
-3.  Reload `systemd` so it recognizes the new service and enables it to start on boot:
+Depending on your Docker version, the command might be `docker-compose` instead of `docker compose`.
 
-    ```bash
-    sudo systemctl daemon-reload
-    sudo systemctl enable homeserver.service
-    ```
+## Available Services
 
-4.  To start the service immediately, run:
+This home server deployment provides the following services:
 
-    ```bash
-    sudo systemctl start homeserver.service
-    ```
+### Web Interfaces
+All web-accessible services are available through a secure reverse proxy with HTTPS encryption:
 
----
+- **Central Dashboard**: https://homeserver/ - Overview page with links to all services.
+- **Pi-hole**: https://pihole.homeserver - Network-wide ad blocking and DNS management.
+- **Home Assistant**: https://ha.homeserver - Home automation and smart device control panel.
+- **Komodo**: https://komodo.homeserver - Server management and deployment automation interface.
+- **Webmin**: https://webmin.homeserver - System administration web console
+
+### Network Services
+- **PostgreSQL Database**: Accessible on port 5432 for database operations and application connectivity.
+- **Pi-hole DNS Service**: Listening on port 53 for network-wide DNS resolution and filtering.
+
+## Additional Configuration Notes
+
+### Webmin Setup
+
+Webmin is configured through the install script to work with the nginx reverse proxy. The script modifies Webmin's configuration to allow secure access through the reverse proxy.
+
+### SSL Certificates
+
+The self-signed certificates generated during installation need to be trusted on your devices:
+
+1. Locate the ca.crt file generated by the install script (`<project_folder>/nginx/ssl/ca.crt`).
+2. Import it into your device's trusted root certificate authorities.
+3. This will prevent browser security warnings when accessing services.
+
+### Network Considerations
+
+- Ensure your router is configured to use Pi-Hole as the DNS server for your network.
+- The nginx reverse proxy uses port 80 (HTTP) and 443 (HTTPS).
+- Make sure these ports are forwarded correctly if accessing from outside your network.
+
+### Backup Recommendations
+
+Regularly backup:
+
+- PostgreSQL databases using pg_dump.
+- Docker volumes containing application data.
+- Configuration files from the repository.
 
 ## Project Status
 
 The project is currently under development.
+
+## Contributing
+
+Feel free to submit issues and enhancement requests for improving this home server setup.
+
+## License
+
+This project is open source and available under the MIT License.
