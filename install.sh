@@ -2,7 +2,7 @@
 
 # Configurações
 PROJECT_DIR="/home/daniel/home-server"
-SERVICE_NAME="home-server"  # Note o hífen, conforme o arquivo
+SERVICE_NAME="homeserver"
 SERVICE_FILE="/etc/systemd/system/${SERVICE_NAME}.service"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
@@ -29,6 +29,20 @@ log_error() {
 check_root() {
     if [[ $EUID -ne 0 ]]; then
         log_error "Este script deve ser executado como root!"
+        exit 1
+    fi
+}
+
+# Função para detectar o comando docker compose correto
+detect_docker_compose() {
+    # Primeiro tenta docker compose (com espaço) - versão mais nova
+    if command -v docker > /dev/null && docker compose version > /dev/null 2>&1; then
+        echo "docker compose"
+    # Depois tenta docker-compose (com hífen) - versão mais antiga
+    elif command -v docker-compose > /dev/null; then
+        echo "docker-compose"
+    else
+        log_error "Docker Compose não está instalado!"
         exit 1
     fi
 }
@@ -147,11 +161,9 @@ check_dependencies() {
         exit 1
     fi
     
-    # Verificar docker-compose
-    if ! command -v docker-compose &> /dev/null; then
-        log_error "Docker Compose não está instalado!"
-        exit 1
-    fi
+    # Verificar docker compose (usando a função de detecção)
+    DOCKER_COMPOSE_CMD=$(detect_docker_compose)
+    log_info "Comando Docker Compose detectado: $DOCKER_COMPOSE_CMD"
     
     # Verificar openssl
     if ! command -v openssl &> /dev/null; then
@@ -171,6 +183,7 @@ show_summary() {
     log_info "Arquivo de serviço: $SERVICE_FILE"
     log_info "Script start: $PROJECT_DIR/start-service.sh"
     log_info "Script stop: $PROJECT_DIR/stop-service.sh"
+    log_info "Docker Compose: $DOCKER_COMPOSE_CMD"
     echo ""
     log_info "Comandos úteis:"
     log_info "  Iniciar serviço: systemctl start $SERVICE_NAME"
