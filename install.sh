@@ -4,6 +4,8 @@
 DEFAULT_PROJECT_DIR="/home/daniel/home-server"
 SERVICE_NAME="homeserver"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+WEBMIN_CONFIG_DIR="/etc/webmin"
+WEBMIN_ALLOW_NETWORKS="172.20.0.0/24 10.1.1.0/24"
 
 # Cores para output
 RED='\033[0;31m'
@@ -99,6 +101,94 @@ check_service_scripts() {
     log_info "Scripts de serviço verificados e tornados executáveis"
 }
 
+# Função para configurar Webmin
+configure_webmin() {
+    log_info "Configurando Webmin para aceitar conexões do proxy..."
+    
+    # Verificar se Webmin está instalado
+    if [[ ! -d "$WEBMIN_CONFIG_DIR" ]]; then
+        log_warn "Webmin não está instalado. Pulando configuração do Webmin."
+        return 0
+    fi
+    
+    # Backup dos arquivos originais
+    backup_timestamp=$(date +%Y%m%d_%H%M%S)
+    if [[ -f "$WEBMIN_CONFIG_DIR/config" ]]; then
+        cp "$WEBMIN_CONFIG_DIR/config" "$WEBMIN_CONFIG_DIR/config.backup_$backup_timestamp"
+    fi
+    if [[ -f "$WEBMIN_CONFIG_DIR/miniserv.conf" ]]; then
+        cp "$WEBMIN_CONFIG_DIR/miniserv.conf" "$WEBMIN_CONFIG_DIR/miniserv.conf.backup_$backup_timestamp"
+    fi
+    
+    # Configurar /etc/webmin/config
+    cat > "$WEBMIN_CONFIG_DIR/config" << EOF
+allow=$WEBMIN_ALLOW_NETWORKS
+referers=webmin.homeserver
+noreferers=*
+ssl_redirect=0
+no_ssl_redirect=1
+EOF
+    
+    # Configurar /etc/webmin/miniserv.conf
+    if [[ -f "$WEBMIN_CONFIG_DIR/miniserv.conf" ]]; then
+        # Remover configurações SSL problemáticas
+        sed -i '/^ssl=/d' "$WEBMIN_CONFIG_DIR/miniserv.conf"
+        sed -i '/^ssl_keyfile=/d' "$WEBMIN_CONFIG_DIR/miniserv.conf"
+        sed -i '/^ssl_certfile=/d' "$WEBMIN_CONFIG_DIR/miniserv.conf"
+        sed -i '/^ssl_enforce=/d' "$WEBMIN_CONFIG_DIR/miniserv.conf"
+        sed -i '/^ssl_hsts=/d' "$WEBMIN_CONFIG_DIR/miniserv.conf"
+        sed -i '/^no_trust_ssl=/d' "$WEBMIN_CONFIG_DIR/miniserv.conf"
+        
+        # Adicionar/atualizar configurações necessárias
+        if ! grep -q "^allow=" "$WEBMIN_CONFIG_DIR/miniserv.conf"; then
+            echo "allow=$WEBMIN_ALLOW_NETWORKS" >> "$WEBMIN_CONFIG_DIR/miniserv.conf"
+        else
+            sed -i "s/^allow=.*/allow=$WEBMIN_ALLOW_NETWORKS/" "$WEBMIN_CONFIG_DIR/miniserv.conf"
+        fi
+        
+        if ! grep -q "^referers=" "$WEBMIN_CONFIG_DIR/miniserv.conf"; then
+            echo "referers=webmin.homeserver" >> "$WEBMIN_CONFIG_DIR/miniserv.conf"
+        else
+            sed -i "s/^referers=.*/referers=webmin.homeserver/" "$WEBMIN_CONFIG_DIR/miniserv.conf"
+        fi
+        
+        if ! grep -q "^trust_real_ip=" "$WEBMIN_CONFIG_DIR/miniserv.conf"; then
+            echo "trust_real_ip=1" >> "$WEBMIN_CONFIG_DIR/miniserv.conf"
+        else
+            sed -i "s/^trust_real_ip=.*/trust_real_ip=1/" "$WEBMIN_CONFIG_DIR/miniserv.conf"
+        fi
+        
+        if ! grep -q "^trusted_proxies=" "$WEBMIN_CONFIG_DIR/miniserv.conf"; then
+            echo "trusted_proxies=172.20.0.100" >> "$WEBMIN_CONFIG_DIR/miniserv.conf"
+        else
+            sed -i "s/^trusted_proxies=.*/trusted_proxies=172.20.0.100/" "$WEBMIN_CONFIG_DIR/miniserv.conf"
+        fi
+        
+        # Garantir bind correto
+        sed -i 's/^bind=.*/bind=0.0.0.0/' "$WEBMIN_CONFIG_DIR/miniserv.conf"
+        
+    else
+        log_error "Arquivo miniserv.conf não encontrado!"
+        return 1
+    fi
+    
+    log_info "Configuração do Webmin atualizada com sucesso"
+    log_info "Redes permitidas: $WEBMIN_ALLOW_NETWORKS"
+    
+    # Reiniciar Webmin se estiver rodando
+    if systemctl is-active --quiet webmin; then
+        log_info "Reiniciando Webmin para aplicar configurações..."
+        systemctl restart webmin
+        if [[ $? -eq 0 ]]; then
+            log_info "Webmin reiniciado com sucesso"
+        else
+            log_warn "Falha ao reiniciar Webmin. Reinicie manualmente: systemctl restart webmin"
+        fi
+    fi
+    
+    return 0
+}
+
 # Função para criar arquivo de serviço dinamicamente
 create_service_file() {
     local service_file="$1"
@@ -127,12 +217,6 @@ EOF
     if [[ $? -eq 0 ]]; then
         log_info "Arquivo de serviço criado com sucesso"
         chmod 644 "$service_file"
-        
-        # Mostrar conteúdo do arquivo criado
-        log_info "Conteúdo do arquivo de serviço:"
-        echo "----------------------------------------"
-        cat "$service_file"
-        echo "----------------------------------------"
     else
         log_error "Falha ao criar arquivo de serviço!"
         exit 1
@@ -199,11 +283,13 @@ show_summary() {
     log_info "Serviço: $SERVICE_NAME"
     log_info "Arquivo de serviço: $SERVICE_FILE"
     log_info "Docker Compose: $DOCKER_COMPOSE_CMD"
+    log_info "Webmin configurado para redes: $WEBMIN_ALLOW_NETWORKS"
     echo ""
     log_info "Comandos úteis:"
     log_info "  Iniciar serviço: systemctl start $SERVICE_NAME"
     log_info "  Parar serviço: systemctl stop $SERVICE_NAME"
     log_info "  Status: systemctl status $SERVICE_NAME"
+    log_info "  Reiniciar Webmin: systemctl restart webmin"
     echo ""
     log_info "Certificados em: $PROJECT_DIR/nginx/ssl/"
     echo ""
@@ -223,6 +309,9 @@ main() {
     check_project_dir
     check_service_scripts
     
+    # Configurar Webmin
+    configure_webmin
+    
     # Criar arquivo de serviço dinamicamente
     create_service_file "$SERVICE_FILE" "$PROJECT_DIR"
     setup_service
@@ -232,6 +321,7 @@ main() {
     
     log_info "Instalação concluída com sucesso! 🚀"
     log_warn "Execute 'systemctl start $SERVICE_NAME' para iniciar os serviços"
+    log_warn "Execute 'systemctl restart webmin' se o Webmin estiver instalado"
 }
 
 main "$@"
