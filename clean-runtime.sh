@@ -2,8 +2,8 @@
 
 # Configurações
 PROJECT_DIR="/home/daniel/home-server"
+PROJECT_NAME="home-server"  # Nome do projeto no docker-compose
 RUNTIME_DIR="$PROJECT_DIR/runtime_config"
-DOCKER_COMPOSE_FILE="$PROJECT_DIR/docker-compose.yaml"
 
 # Cores para output
 RED='\033[0;31m'
@@ -45,39 +45,38 @@ clean_runtime_dir() {
     fi
 }
 
-# Função para remover volumes Docker específicos
+# Função para listar e remover volumes do projeto Docker
 clean_docker_volumes() {
-    log_info "Verificando volumes Docker do projeto..."
+    log_info "Procurando volumes Docker do projeto '$PROJECT_NAME'..."
     
-    if [[ ! -f "$DOCKER_COMPOSE_FILE" ]]; then
-        log_error "Arquivo docker-compose.yaml não encontrado: $DOCKER_COMPOSE_FILE"
-        exit 1
-    fi
-    
-    # Lista de volumes definidos no docker-compose.yaml
-    VOLUMES=$(grep -E "^\s+[a-zA-Z0-9_-]+:" "$DOCKER_COMPOSE_FILE" | \
-              grep -v "name:" | \
-              sed 's/^\s*//;s/://' | \
-              tr -d ' ' | sort | uniq)
+    # Listar todos os volumes Docker e filtrar os do projeto
+    VOLUMES=$(docker volume ls -q | grep "^${PROJECT_NAME}_" | sort)
     
     if [[ -z "$VOLUMES" ]]; then
-        log_warn "Nenhum volume encontrado no docker-compose.yaml"
+        log_warn "Nenhum volume Docker encontrado para o projeto '$PROJECT_NAME'"
+        
+        # Tentar encontrar volumes sem prefixo (para projetos mais antigos)
+        log_info "Procurando volumes sem prefixo..."
+        VOLUMES=$(docker volume ls -q | grep -E "(mongo-data|mongo-config|postgres_data)" | sort)
+    fi
+    
+    if [[ -z "$VOLUMES" ]]; then
+        log_warn "Nenhum volume Docker encontrado"
         return
     fi
     
-    log_info "Volumes encontrados no docker-compose:"
+    log_info "Volumes Docker encontrados:"
     echo "$VOLUMES" | while read volume; do
         echo "   - $volume"
     done
     
     # Remover cada volume
     echo "$VOLUMES" | while read volume; do
-        if docker volume inspect "${volume}" >/dev/null 2>&1; then
-            log_info "Removendo volume Docker: $volume"
-            docker volume rm -f "$volume" 2>/dev/null || \
-            log_warn "Não foi possível remover volume: $volume (pode estar em uso)"
+        log_info "Removendo volume Docker: $volume"
+        if docker volume rm -f "$volume" 2>/dev/null; then
+            log_info "✅ Volume $volume removido"
         else
-            log_warn "Volume não existe: $volume"
+            log_warn "⚠️  Não foi possível remover volume: $volume (pode estar em uso)"
         fi
     done
     
@@ -110,3 +109,4 @@ main() {
 
 # Executar função principal
 main "$@"
+
