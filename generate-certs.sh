@@ -33,10 +33,10 @@ extract_subdomains() {
                  grep -v "^\s*$" | \
                  grep -v "^${SERVER_HOSTNAME}$" | \
                  grep -v "^${SERVER_HOSTNAME}.${DOMAIN_SUFFIX}$" | \
-                 grep -v "^~" | \  # Remover wildcards como ~.homeserver
-                 grep "\." | \     # Manter apenas os que contêm ponto (subdomínios)
-                 sed "s/\.${SERVER_HOSTNAME}.${DOMAIN_SUFFIX}//" | \
-                 sed "s/\.${SERVER_HOSTNAME}//" | \
+                 grep -v "^~" | \
+                 grep "\\." | \
+                 sed "s/\\.${SERVER_HOSTNAME}.${DOMAIN_SUFFIX}//" | \
+                 sed "s/\\.${SERVER_HOSTNAME}//" | \
                  sort | uniq)
     
     # Remover entradas vazias ou inválidas
@@ -54,6 +54,7 @@ extract_subdomains() {
     echo "$SUBDOMAINS" | while read sub; do
         if [[ ! -z "$sub" ]]; then
             echo "   - $sub.${SERVER_HOSTNAME}.${DOMAIN_SUFFIX}"
+            echo "   - $sub.${SERVER_HOSTNAME}"  # Sem .lan também
         fi
     done
 }
@@ -74,10 +75,13 @@ main() {
     # Criar lista de Subject Alternative Names (SAN)
     SAN="DNS:${SERVER_HOSTNAME}, DNS:${SERVER_HOSTNAME}.${DOMAIN_SUFFIX}, DNS:localhost, IP:${SERVER_IP}"
 
-    # Adicionar todos os subdomínios detectados
+    # Adicionar todos os subdomínios detectados (COM e SEM .lan)
     for sub in $SUBDOMAINS; do
         if [[ ! -z "$sub" ]]; then
+            # Com sufixo .lan
             SAN="$SAN, DNS:${sub}.${SERVER_HOSTNAME}.${DOMAIN_SUFFIX}"
+            # Sem sufixo .lan
+            SAN="$SAN, DNS:${sub}.${SERVER_HOSTNAME}"
         fi
     done
 
@@ -173,3 +177,4 @@ EOF
 
 # Executar função principal
 main "$@"
+
