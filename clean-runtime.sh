@@ -1,15 +1,50 @@
 #!/bin/bash
 
-# Configurações
-PROJECT_DIR="/home/daniel/home-server"
-PROJECT_NAME="home-server"  # Nome do projeto no docker-compose
-RUNTIME_DIR="$PROJECT_DIR/runtime_config"
+# Configurações padrão
+DEFAULT_PROJECT_DIR="/home/daniel/home-server"
+DEFAULT_PROJECT_NAME="home-server"
 
 # Cores para output
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 NC='\033[0m' # No Color
+
+# Função para mostrar uso
+show_usage() {
+    echo "Uso: $0 [--path CAMINHO_DO_PROJETO] [--name NOME_DO_PROJETO]"
+    echo "  --path CAMINHO_DO_PROJETO  Diretório do projeto (padrão: $DEFAULT_PROJECT_DIR)"
+    echo "  --name NOME_DO_PROJETO     Nome do projeto Docker (padrão: $DEFAULT_PROJECT_NAME)"
+    exit 1
+}
+
+# Função para parsear argumentos
+parse_arguments() {
+    PROJECT_DIR="$DEFAULT_PROJECT_DIR"
+    PROJECT_NAME="$DEFAULT_PROJECT_NAME"
+    
+    while [[ $# -gt 0 ]]; do
+        case $1 in
+            --path)
+                PROJECT_DIR="$2"
+                shift 2
+                ;;
+            --name)
+                PROJECT_NAME="$2"
+                shift 2
+                ;;
+            --help|-h)
+                show_usage
+                ;;
+            *)
+                echo -e "${RED}Argumento desconhecido: $1${NC}"
+                show_usage
+                ;;
+        esac
+    done
+    
+    RUNTIME_DIR="$PROJECT_DIR/runtime_config"
+}
 
 # Função para log colorido
 log_info() {
@@ -85,6 +120,8 @@ clean_docker_volumes() {
 
 # Função principal
 main() {
+    parse_arguments "$@"
+    
     echo -e "${GREEN}"
     echo "========================================"
     echo "    LIMPEZA DE RUNTIME E VOLUMES"
@@ -107,6 +144,4 @@ main() {
     echo -e "${GREEN}✅ Limpeza de runtime e volumes concluída${NC}"
 }
 
-# Executar função principal
 main "$@"
-

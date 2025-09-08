@@ -1,21 +1,49 @@
 #!/bin/bash
 
-# Configurações - 5 ANOS DE VALIDADE
+# Configurações padrão
+DEFAULT_PROJECT_DIR="/home/daniel/home-server"
+SERVER_IP="10.1.1.2"
+SERVER_HOSTNAME="homeserver"
+DOMAIN_SUFFIX="lan"
 CA_DAYS=18250
 SERVER_DAYS=1825
-SERVER_IP="10.1.1.2"  # SEU IP CORRETO
-SERVER_HOSTNAME="homeserver"
-DOMAIN_SUFFIX="lan"   # SUFIXO DA SUA REDE
-
-PROJECT_DIR="/home/daniel/home-server"
-NGINX_SSL_DIR="$PROJECT_DIR/nginx/ssl"
-NGINX_CONF_FILE="$PROJECT_DIR/nginx/reverse-proxy.conf"
 
 # Cores para output
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 RED='\033[0;31m'
 NC='\033[0m'
+
+# Função para mostrar uso
+show_usage() {
+    echo "Uso: $0 [--path CAMINHO_DO_PROJETO]"
+    echo "  --path CAMINHO_DO_PROJETO  Diretório do projeto (padrão: $DEFAULT_PROJECT_DIR)"
+    exit 1
+}
+
+# Função para parsear argumentos
+parse_arguments() {
+    PROJECT_DIR="$DEFAULT_PROJECT_DIR"
+    
+    while [[ $# -gt 0 ]]; do
+        case $1 in
+            --path)
+                PROJECT_DIR="$2"
+                shift 2
+                ;;
+            --help|-h)
+                show_usage
+                ;;
+            *)
+                echo -e "${RED}Argumento desconhecido: $1${NC}"
+                show_usage
+                ;;
+        esac
+    done
+    
+    NGINX_SSL_DIR="$PROJECT_DIR/nginx/ssl"
+    NGINX_CONF_FILE="$PROJECT_DIR/nginx/reverse-proxy.conf"
+}
 
 # Função para extrair subdomínios do nginx CORRETAMENTE
 extract_subdomains() {
@@ -61,6 +89,8 @@ extract_subdomains() {
 
 # Função principal
 main() {
+    parse_arguments "$@"
+    
     echo -e "${GREEN}🔐 Iniciando geração de certificados...${NC}"
     echo -e "${GREEN}📅 Validade: 5 ANOS${NC}"
     echo -e "${YELLOW}📝 IP do servidor: $SERVER_IP${NC}"
@@ -175,6 +205,4 @@ EOF
     echo -e "${GREEN}📁 Certificados disponíveis em: $NGINX_SSL_DIR/${NC}"
 }
 
-# Executar função principal
 main "$@"
-

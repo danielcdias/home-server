@@ -2,7 +2,6 @@
 
 # Configurações
 SERVICE_NAME="homeserver"
-SERVICE_FILE="/etc/systemd/system/${SERVICE_NAME}.service"
 
 # Cores para output
 RED='\033[0;31m'
@@ -33,9 +32,10 @@ check_root() {
 
 # Função para remover o serviço
 remove_service() {
+    SERVICE_FILE="/etc/systemd/system/${SERVICE_NAME}.service"
+    
     log_info "Verificando serviço: $SERVICE_NAME"
     
-    # Parar o serviço se estiver rodando
     if systemctl is-active --quiet "$SERVICE_NAME"; then
         log_info "Parando serviço..."
         systemctl stop "$SERVICE_NAME"
@@ -43,7 +43,6 @@ remove_service() {
         log_warn "Serviço não está em execução"
     fi
     
-    # Desabilitar o serviço
     if systemctl is-enabled --quiet "$SERVICE_NAME"; then
         log_info "Desabilitando serviço..."
         systemctl disable "$SERVICE_NAME"
@@ -51,7 +50,6 @@ remove_service() {
         log_warn "Serviço não estava habilitado"
     fi
     
-    # Remover arquivo de serviço
     if [[ -f "$SERVICE_FILE" ]]; then
         log_info "Removendo arquivo de serviço: $SERVICE_FILE"
         rm -f "$SERVICE_FILE"
@@ -59,8 +57,6 @@ remove_service() {
         log_warn "Arquivo de serviço não encontrado: $SERVICE_FILE"
     fi
     
-    # Recarregar systemd
-    log_info "Recarregando systemd..."
     systemctl daemon-reload
     systemctl reset-failed
     
@@ -81,5 +77,4 @@ main() {
     echo -e "${GREEN}✅ Serviço '$SERVICE_NAME' removido do systemd${NC}"
 }
 
-# Executar função principal
 main "$@"
