@@ -17,7 +17,7 @@ YELLOW='\033[1;33m'
 RED='\033[0;31m'
 NC='\033[0m'
 
-# Função para extrair subdomínios do nginx
+# Função para extrair subdomínios do nginx CORRETAMENTE
 extract_subdomains() {
     echo -e "${GREEN}🔍 Analisando configuração do nginx...${NC}"
     
@@ -26,23 +26,36 @@ extract_subdomains() {
         exit 1
     fi
     
-    # Extrair todos os server_name, remover ';' e espaços, separar por linha
+    # Extrair TODOS os server_name, filtrando apenas os que contêm ponto (subdomínios)
     SUBDOMAINS=$(grep -oP 'server_name\s+\K[^;]+' "$NGINX_CONF_FILE" | \
                  tr ' ' '\n' | \
-                 grep -v "$SERVER_HOSTNAME" | \
+                 grep -v "^$" | \
                  grep -v "^\s*$" | \
-                 sed "s/\.$SERVER_HOSTNAME//" | \
+                 grep -v "^${SERVER_HOSTNAME}$" | \
+                 grep -v "^${SERVER_HOSTNAME}.${DOMAIN_SUFFIX}$" | \
+                 grep -v "^~" | \  # Remover wildcards como ~.homeserver
+                 grep "\." | \     # Manter apenas os que contêm ponto (subdomínios)
+                 sed "s/\.${SERVER_HOSTNAME}.${DOMAIN_SUFFIX}//" | \
+                 sed "s/\.${SERVER_HOSTNAME}//" | \
                  sort | uniq)
     
+    # Remover entradas vazias ou inválidas
+    SUBDOMAINS=$(echo "$SUBDOMAINS" | grep -v "^\s*$" | grep -v "^${SERVER_HOSTNAME}" | grep -v "^localhost$")
+    
     if [[ -z "$SUBDOMAINS" ]]; then
-        echo -e "${YELLOW}⚠️  Nenhum subdomínio encontrado na configuração do nginx${NC}"
-        SUBDOMAINS=""
-    else
-        echo -e "${GREEN}✅ Subdomínios detectados:${NC}"
-        echo "$SUBDOMAINS" | while read sub; do
-            echo "   - $sub.$SERVER_HOSTNAME.$DOMAIN_SUFFIX"
-        done
+        echo -e "${RED}❌ ERRO: Nenhum subdomínio encontrado na configuração do nginx${NC}"
+        echo -e "${YELLOW}📋 Verifique o arquivo: $NGINX_CONF_FILE${NC}"
+        echo -e "${YELLOW}📋 Conteúdo encontrado:${NC}"
+        grep -oP 'server_name\s+\K[^;]+' "$NGINX_CONF_FILE" | tr ' ' '\n'
+        exit 1
     fi
+    
+    echo -e "${GREEN}✅ Subdomínios detectados:${NC}"
+    echo "$SUBDOMAINS" | while read sub; do
+        if [[ ! -z "$sub" ]]; then
+            echo "   - $sub.${SERVER_HOSTNAME}.${DOMAIN_SUFFIX}"
+        fi
+    done
 }
 
 # Função principal
@@ -59,15 +72,17 @@ main() {
     extract_subdomains
 
     # Criar lista de Subject Alternative Names (SAN)
-    SAN="DNS:$SERVER_HOSTNAME, DNS:$SERVER_HOSTNAME.$DOMAIN_SUFFIX, DNS:localhost, IP:$SERVER_IP"
+    SAN="DNS:${SERVER_HOSTNAME}, DNS:${SERVER_HOSTNAME}.${DOMAIN_SUFFIX}, DNS:localhost, IP:${SERVER_IP}"
 
     # Adicionar todos os subdomínios detectados
     for sub in $SUBDOMAINS; do
-        SAN="$SAN, DNS:$sub.$SERVER_HOSTNAME.$DOMAIN_SUFFIX"
+        if [[ ! -z "$sub" ]]; then
+            SAN="$SAN, DNS:${sub}.${SERVER_HOSTNAME}.${DOMAIN_SUFFIX}"
+        fi
     done
 
     echo -e "${GREEN}📋 Subject Alternative Names configurados:${NC}"
-    echo "$SAN" | tr ',' '\n' | sed 's/^DNS://' | sed 's/^IP://' | sed 's/^/   /'
+    echo "$SAN" | tr ',' '\n' | sed 's/^ //' | sed 's/^/   /'
 
     # Criar diretório de certificados temporário
     mkdir -p ~/certs && cd ~/certs
@@ -91,7 +106,7 @@ req_extensions = v3_req
 prompt = no
 
 [req_distinguished_name]
-CN = $SERVER_HOSTNAME.$DOMAIN_SUFFIX
+CN = ${SERVER_HOSTNAME}.${DOMAIN_SUFFIX}
 O = Home Server
 C = BR
 
