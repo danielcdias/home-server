@@ -2,9 +2,13 @@
 
 # Configurações padrão
 DEFAULT_PROJECT_DIR="/home/daniel/home-server"
+DEFAULT_HOSTNAME=$(hostname | cut -d'.' -f1)
+if [[ -z "$DEFAULT_HOSTNAME" || "$DEFAULT_HOSTNAME" == "localhost" ]]; then
+    DEFAULT_HOSTNAME="homeserver"
+fi
+DEFAULT_DOMAIN_SUFFIX="lan"
+ENABLE_WEBMIN=true
 SERVER_IP="10.1.1.2"
-SERVER_HOSTNAME="homeserver"
-DOMAIN_SUFFIX="lan"
 CA_DAYS=18250
 SERVER_DAYS=1825
 
@@ -12,23 +16,61 @@ SERVER_DAYS=1825
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 RED='\033[0;31m'
+BLUE='\033[0;34m'
 NC='\033[0m'
 
 # Função para mostrar uso
 show_usage() {
-    echo "Uso: $0 [--path CAMINHO_DO_PROJETO]"
-    echo "  --path CAMINHO_DO_PROJETO  Diretório do projeto (padrão: $DEFAULT_PROJECT_DIR)"
+    echo "Uso: $0 [OPÇÕES]"
+    echo "Opções:"
+    echo "  --path CAMINHO_DO_PROJETO    Diretório do projeto (padrão: $DEFAULT_PROJECT_DIR)"
+    echo "  --hostname NOME_DO_HOST      Nome do host (padrão: $DEFAULT_HOSTNAME)"
+    echo "  --domain-suffix SUFIXO       Sufixo do domínio (padrão: $DEFAULT_DOMAIN_SUFFIX)"
+    echo "  --webmin [true|false]        Habilitar Webmin (padrão: true)"
+    echo "  --help, -h                   Mostrar esta ajuda"
     exit 1
+}
+
+# Função para log colorido
+log_info() {
+    echo -e "${GREEN}[INFO]${NC} $1"
+}
+
+log_warn() {
+    echo -e "${YELLOW}[WARN]${NC} $1"
+}
+
+log_error() {
+    echo -e "${RED}[ERROR]${NC} $1"
 }
 
 # Função para parsear argumentos
 parse_arguments() {
     PROJECT_DIR="$DEFAULT_PROJECT_DIR"
+    SERVER_HOSTNAME="$DEFAULT_HOSTNAME"
+    DOMAIN_SUFFIX="$DEFAULT_DOMAIN_SUFFIX"
+    ENABLE_WEBMIN=true
     
     while [[ $# -gt 0 ]]; do
         case $1 in
             --path)
                 PROJECT_DIR="$2"
+                shift 2
+                ;;
+            --hostname)
+                SERVER_HOSTNAME="$2"
+                shift 2
+                ;;
+            --domain-suffix)
+                DOMAIN_SUFFIX="$2"
+                shift 2
+                ;;
+            --webmin)
+                if [[ "$2" == "true" ]]; then
+                    ENABLE_WEBMIN=true
+                elif [[ "$2" == "false" ]]; then
+                    ENABLE_WEBMIN=false
+                fi
                 shift 2
                 ;;
             --help|-h)
@@ -43,6 +85,8 @@ parse_arguments() {
     
     NGINX_SSL_DIR="$PROJECT_DIR/nginx/ssl"
     NGINX_CONF_FILE="$PROJECT_DIR/nginx/reverse-proxy.conf"
+    
+    echo -e "${GREEN}Configuração: Hostname=$SERVER_HOSTNAME, Domínio=$DOMAIN_SUFFIX, Webmin=$ENABLE_WEBMIN, Path=$PROJECT_DIR${NC}"
 }
 
 # Função para extrair subdomínios do nginx CORRETAMENTE
@@ -70,6 +114,12 @@ extract_subdomains() {
     # Remover entradas vazias ou inválidas
     SUBDOMAINS=$(echo "$SUBDOMAINS" | grep -v "^\s*$" | grep -v "^${SERVER_HOSTNAME}" | grep -v "^localhost$")
     
+    # Remover webmin se não estiver habilitado
+    if [[ "$ENABLE_WEBMIN" == false ]]; then
+        SUBDOMAINS=$(echo "$SUBDOMAINS" | grep -v "webmin")
+        echo -e "${YELLOW}⚠️  Webmin desabilitado - removendo dos certificados${NC}"
+    fi
+    
     if [[ -z "$SUBDOMAINS" ]]; then
         echo -e "${RED}❌ ERRO: Nenhum subdomínio encontrado na configuração do nginx${NC}"
         echo -e "${YELLOW}📋 Verifique o arquivo: $NGINX_CONF_FILE${NC}"
@@ -96,6 +146,7 @@ main() {
     echo -e "${YELLOW}📝 IP do servidor: $SERVER_IP${NC}"
     echo -e "${YELLOW}📝 Hostname: $SERVER_HOSTNAME${NC}"
     echo -e "${YELLOW}📝 Domínio: $DOMAIN_SUFFIX${NC}"
+    echo -e "${YELLOW}🖥️  Webmin: $ENABLE_WEBMIN${NC}"
     echo -e "${YELLOW}📁 Diretório do projeto: $PROJECT_DIR${NC}"
     echo ""
 

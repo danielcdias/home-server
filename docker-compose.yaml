@@ -3,6 +3,7 @@ services:
 
   komodo-mongo:
     container_name: komodo-mongo
+    hostname: komodo-mongo
     image: mongo
     labels:
       komodo.skip:
@@ -20,6 +21,7 @@ services:
   
   komodo-core:
     container_name: komodo-core
+    hostname: komodo-core
     image: ghcr.io/moghtech/komodo-core:${COMPOSE_KOMODO_IMAGE_TAG:-latest}
     labels:
       komodo.skip:
@@ -46,6 +48,7 @@ services:
 
   komodo-periphery:
     container_name: komodo-periphery
+    hostname: komodo-periphery
     image: ghcr.io/moghtech/komodo-periphery:${COMPOSE_KOMODO_IMAGE_TAG:-latest}
     labels:
       komodo.skip:
@@ -60,6 +63,7 @@ services:
 
   postgres:
     container_name: postgres
+    hostname: postgres
     build:
       context: ./postgres
       dockerfile: Dockerfile
@@ -81,6 +85,7 @@ services:
 
   pihole:
     container_name: pihole
+    hostname: pihole
     image: pihole/pihole:latest
     ports:
       - "53:53/tcp"
@@ -108,6 +113,7 @@ services:
 
   homeassistant:
     container_name: homeassistant
+    hostname: homeassistant
     image: ghcr.io/home-assistant/home-assistant:stable
     entrypoint: ["/bin/bash", "/docker-entrypoint.sh"]
     volumes:
@@ -135,6 +141,7 @@ services:
 
   nginx:
     container_name: nginx
+    hostname: nginx
     image: nginx:latest
     restart: always
     ports:
