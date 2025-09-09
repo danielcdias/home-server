@@ -272,7 +272,7 @@ check_service_scripts() {
     log_info "Scripts de serviço verificados e tornados executáveis"
 }
 
-# Função para configurar Webmin (CONFIGURAÇÃO ORIGINAL RESTAURADA)
+# Função para configurar Webmin
 configure_webmin() {
     log_info "Configurando Webmin para aceitar conexões do proxy..."
     
@@ -393,7 +393,7 @@ configure_webmin() {
     return 0
 }
 
-# Função para atualizar arquivos de configuração
+# Função para atualizar arquivos de configuração (CORRIGIDA)
 update_config_files() {
     local project_dir="$1"
     local hostname="$2"
@@ -416,34 +416,58 @@ update_config_files() {
         log_info "✅ generate-certs.sh atualizado"
     fi
     
-    # 2. Atualizar docker-compose.yaml (Pi-hole DNS)
+    # 2. Atualizar docker-compose.yaml (Pi-hole DNS) - CORREÇÃO: apenas hostname sem sufixo
     if [[ -f "$project_dir/docker-compose.yaml" ]]; then
-        sed -i "s|address=/[a-zA-Z0-9_\-]*/|address=/$hostname.$domain_suffix/|g" "$project_dir/docker-compose.yaml"
+        sed -i "s|address=/[a-zA-Z0-9_\-]*/|address=/$hostname/|g" "$project_dir/docker-compose.yaml"
         log_info "✅ docker-compose.yaml atualizado"
     fi
     
-    # 3. Atualizar nginx/reverse-proxy.conf (com suporte opcional ao Webmin)
+    # 3. Atualizar nginx/reverse-proxy.conf (com suporte opcional ao Webmin) - CORREÇÃO: remover completamente
     if [[ -f "$project_dir/nginx/reverse-proxy.conf" ]]; then
-        # Backup do arquivo original
-        cp "$project_dir/nginx/reverse-proxy.conf" "$project_dir/nginx/reverse-proxy.conf.backup"
+        # Atualizar apenas os domínios nos lugares específicos:
         
-        # Atualizar domínios
-        sed -i "s/[a-zA-Z0-9_\-]*\.lan/$hostname.$domain_suffix/g" "$project_dir/nginx/reverse-proxy.conf"
-        sed -i "s/server_name [a-zA-Z0-9_\-]*;/server_name $hostname $hostname.$domain_suffix;/" "$project_dir/nginx/reverse-proxy.conf"
+        # 1. No primeiro bloco server (redirecionamento HTTP) - substituir apenas o hostname
+        sed -i "0,/server_name [a-zA-Z0-9_\-]* ~\.[a-zA-Z0-9_\-]*;/s/server_name [a-zA-Z0-9_\-]* ~\.[a-zA-Z0-9_\-]*;/server_name $hostname ~.$hostname;/" "$project_dir/nginx/reverse-proxy.conf"
         
-        # Remover bloco do Webmin se desabilitado
+        # 2. No segundo bloco server (página inicial) - substituir apenas o hostname
+        sed -i "/# Servidor HTTPS para a página inicial/,/server_name [a-zA-Z0-9_\-]*;/s/server_name [a-zA-Z0-9_\-]*;/server_name $hostname;/" "$project_dir/nginx/reverse-proxy.conf"
+        
+        # 3. Nos blocos de proxy (pihole, ha, komodo, webmin) - substituir apenas a parte do domínio
+        sed -i "s/\(server_name \)[a-zA-Z0-9_\-]*\.lan;/\1$hostname.$domain_suffix;/g" "$project_dir/nginx/reverse-proxy.conf"
+        
+        # 4. Remover bloco do Webmin se desabilitado
         if [[ "$ENABLE_WEBMIN" == false ]]; then
-            sed -i '/# Proxy para o Webmin/,/}/d' "$project_dir/nginx/reverse-proxy.conf"
-            log_info "✅ nginx/reverse-proxy.conf atualizado (sem Webmin)"
+            # Remover bloco completo do Webmin de forma mais precisa
+            webmin_start_line=$(grep -n "# Proxy para o Webmin" "$project_dir/nginx/reverse-proxy.conf" | cut -d: -f1)
+            if [[ -n "$webmin_start_line" ]]; then
+                # Encontrar a linha de fechamento do bloco (a próxima } após o início)
+                webmin_end_line=$(awk -v start="$webmin_start_line" 'NR >= start && /^}$/ {print NR; exit}' "$project_dir/nginx/reverse-proxy.conf")
+                
+                if [[ -n "$webmin_end_line" ]]; then
+                    # Remover o bloco do Webmin
+                    sed -i "${webmin_start_line},${webmin_end_line}d" "$project_dir/nginx/reverse-proxy.conf"
+                    log_info "✅ nginx/reverse-proxy.conf atualizado (sem Webmin)"
+                else
+                    log_warn "Não foi possível encontrar o fim do bloco do Webmin"
+                fi
+            else
+                log_warn "Bloco do Webmin não encontrado no arquivo"
+            fi
         else
             log_info "✅ nginx/reverse-proxy.conf atualizado (com Webmin)"
         fi
     fi
     
-    # 4. Atualizar nginx/html/index.html
+    # 4. Atualizar nginx/html/index.html - CORREÇÃO: remover link do Webmin se desabilitado
     if [[ -f "$project_dir/nginx/html/index.html" ]]; then
         sed -i "s/homeserver/$hostname/g" "$project_dir/nginx/html/index.html"
         sed -i "s/homeserver\.lan/$hostname.$domain_suffix/g" "$project_dir/nginx/html/index.html"
+        
+        # Remover link do Webmin se desabilitado
+        if [[ "$ENABLE_WEBMIN" == false ]]; then
+            sed -i '/<li><a href="http:\/\/webmin\..*" target="_blank">Webmin<\/a><\/li>/d' "$project_dir/nginx/html/index.html"
+        fi
+        
         log_info "✅ nginx/html/index.html atualizado"
     fi
     
@@ -563,8 +587,8 @@ show_summary() {
 
 # Função principal
 main() {
-    parse_arguments "$@"
     check_root
+    parse_arguments "$@"
     check_dependencies
     check_project_dir
     check_service_scripts
@@ -587,3 +611,4 @@ main() {
 }
 
 main "$@"
+
