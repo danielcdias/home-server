@@ -1,12 +1,12 @@
-# home-server
+# 🏠🖥️ home-server
 
-## Project Overview
+## 👁️ Project Overview
 
 This repository contains the configuration for a personal home server, designed to run essential home services using Docker containers. The goal is to create a centralized, modular, and easily reproducible environment for managing network services, home automation, and data storage.
 
 By using a single `docker-compose.yml` file, all services and their dependencies are defined in one place, simplifying setup and ensuring consistent deployment. This approach allows for easy scalability by adding or removing services as needed.
 
-## Key Services
+## 🔑 Key Services
 
 The project currently includes configurations for the following services:
 
@@ -17,11 +17,11 @@ The project currently includes configurations for the following services:
 * **[Komodo](https://komo.do/):** A tool to provide structure for managing your servers, builds, deployments, and automated procedures.
 * **[Webmin](https://webmin.com/):** A system administration tool for Unix-like servers and services (optional).
 
-💡Webmin support is an optional component selected during installation. While the following documentation references Webmin, you may ignore all related sections if you did not install it.
+💡 Webmin support is an optional component selected during installation. While the following documentation references Webmin, you may ignore all related sections if you did not install it.
 
 **Future services:** The modular design allows for the easy addition of other services, such as media servers, file storage, and more.
 
-## Domain and Subdomains
+## 🌐 Domain and Subdomains
 
 The domain for all web services is defined during installation. This project automatically creates the chosen domain and corresponding subdomains for each service with a web interface.
 
@@ -38,7 +38,7 @@ The setup also generates a self-signed certificate for the domain and all subdom
 
 All services are proxied through nginx, which routes traffic from these subdomains to their respective applications.
 
-## Getting Started
+## 🚀 Getting Started
 
 ### Prerequisites
 
@@ -74,11 +74,11 @@ To get started with this project, you need to have the following software instal
 
     ```json
     [
-    {
-        "db_name": "home_assistant",
-        "user": "homeassistant",
-        "password": "a_strong_password"
-    }
+        {
+            "db_name": "home_assistant",
+            "user": "homeassistant",
+            "password": "a_strong_password"
+        }
     ]
     ```
 
@@ -107,7 +107,7 @@ To get started with this project, you need to have the following software instal
 
     Depending on your Docker version, the command might be `docker-compose` instead of `docker compose`.
 
-## Available Services
+## 📡Available Services
 
 This home server deployment provides the following services:
 
@@ -124,7 +124,7 @@ All web-accessible services are available through a secure reverse proxy with HT
 - **PostgreSQL Database**: Accessible on port 5432 for database operations and application connectivity.
 - **Pi-hole DNS Service**: Listening on port 53 for network-wide DNS resolution and filtering.
 
-## Additional Configuration Notes
+## ⚙️ Additional Configuration Notes
 
 ### Webmin Setup
 
@@ -152,14 +152,14 @@ Regularly backup:
 - Docker volumes containing application data.
 - Configuration files from the repository.
 
-## Project Status
+## 📊 Project Status
 
 The project is currently under development.
 
-## Contributing
+## 🤝 Contributing
 
 Feel free to submit issues and enhancement requests for improving this home server setup.
 
-## License
+## 📜 License
 
 This project is open source and available under the MIT License.
