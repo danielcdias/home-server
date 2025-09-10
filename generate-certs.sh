@@ -1,187 +1,94 @@
 #!/bin/bash
 
-# Configurações padrão
-DEFAULT_PROJECT_DIR="/home/daniel/home-server"
-DEFAULT_HOSTNAME=$(hostname | cut -d'.' -f1)
-if [[ -z "$DEFAULT_HOSTNAME" || "$DEFAULT_HOSTNAME" == "localhost" ]]; then
-    DEFAULT_HOSTNAME="homeserver"
-fi
-DEFAULT_DOMAIN_SUFFIX="lan"
-ENABLE_WEBMIN=true
-SERVER_IP="10.1.1.2"
+# Configurações
 CA_DAYS=18250
 SERVER_DAYS=1825
+SERVER_IP="10.1.1.2" # Você pode querer tornar isso um argumento também
 
 # Cores para output
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 RED='\033[0;31m'
-BLUE='\033[0;34m'
 NC='\033[0m'
 
-# Função para mostrar uso
-show_usage() {
-    echo "Uso: $0 [OPÇÕES]"
-    echo "Opções:"
-    echo "  --path CAMINHO_DO_PROJETO    Diretório do projeto (padrão: $DEFAULT_PROJECT_DIR)"
-    echo "  --hostname NOME_DO_HOST      Nome do host (padrão: $DEFAULT_HOSTNAME)"
-    echo "  --domain-suffix SUFIXO       Sufixo do domínio (padrão: $DEFAULT_DOMAIN_SUFFIX)"
-    echo "  --webmin [true|false]        Habilitar Webmin (padrão: true)"
-    echo "  --help, -h                   Mostrar esta ajuda"
-    exit 1
-}
-
-# Função para log colorido
+# Função para log
 log_info() {
     echo -e "${GREEN}[INFO]${NC} $1"
 }
 
-log_warn() {
-    echo -e "${YELLOW}[WARN]${NC} $1"
-}
-
-log_error() {
-    echo -e "${RED}[ERROR]${NC} $1"
+# Função para mostrar uso
+show_usage() {
+    echo "Uso: $0 --path CAMINHO --hostname NOME --domain-suffix SUFIXO [--webmin true|false]"
+    exit 1
 }
 
 # Função para parsear argumentos
 parse_arguments() {
-    PROJECT_DIR="$DEFAULT_PROJECT_DIR"
-    SERVER_HOSTNAME="$DEFAULT_HOSTNAME"
-    DOMAIN_SUFFIX="$DEFAULT_DOMAIN_SUFFIX"
+    # Definir padrões
+    PROJECT_DIR=""
+    SERVER_HOSTNAME=""
+    DOMAIN_SUFFIX=""
     ENABLE_WEBMIN=true
     
     while [[ $# -gt 0 ]]; do
         case $1 in
-            --path)
-                PROJECT_DIR="$2"
-                shift 2
-                ;;
-            --hostname)
-                SERVER_HOSTNAME="$2"
-                shift 2
-                ;;
-            --domain-suffix)
-                DOMAIN_SUFFIX="$2"
-                shift 2
-                ;;
-            --webmin)
-                if [[ "$2" == "true" ]]; then
-                    ENABLE_WEBMIN=true
-                elif [[ "$2" == "false" ]]; then
-                    ENABLE_WEBMIN=false
-                fi
-                shift 2
-                ;;
-            --help|-h)
-                show_usage
-                ;;
-            *)
-                echo -e "${RED}Argumento desconhecido: $1${NC}"
-                show_usage
-                ;;
+            --path) PROJECT_DIR="$2"; shift 2 ;;
+            --hostname) SERVER_HOSTNAME="$2"; shift 2 ;;
+            --domain-suffix) DOMAIN_SUFFIX="$2"; shift 2 ;;
+            --webmin) [[ "$2" == "true" ]] && ENABLE_WEBMIN=true || ENABLE_WEBMIN=false; shift 2 ;;
+            --help|-h) show_usage ;;
+            *) echo -e "${RED}Argumento desconhecido: $1${NC}"; show_usage ;;
         esac
     done
+
+    if [[ -z "$PROJECT_DIR" || -z "$SERVER_HOSTNAME" || -z "$DOMAIN_SUFFIX" ]]; then
+        echo -e "${RED}Erro: --path, --hostname e --domain-suffix são obrigatórios.${NC}"
+        show_usage
+    fi
     
     NGINX_SSL_DIR="$PROJECT_DIR/nginx/ssl"
-    NGINX_CONF_FILE="$PROJECT_DIR/nginx/reverse-proxy.conf"
-    
-    echo -e "${GREEN}Configuração: Hostname=$SERVER_HOSTNAME, Domínio=$DOMAIN_SUFFIX, Webmin=$ENABLE_WEBMIN, Path=$PROJECT_DIR${NC}"
-}
-
-# Função para extrair subdomínios do nginx CORRETAMENTE
-extract_subdomains() {
-    echo -e "${GREEN}🔍 Analisando configuração do nginx...${NC}"
-    
-    if [[ ! -f "$NGINX_CONF_FILE" ]]; then
-        echo -e "${RED}❌ Arquivo de configuração do nginx não encontrado: $NGINX_CONF_FILE${NC}"
-        exit 1
-    fi
-    
-    # Extrair TODOS os server_name, filtrando apenas os que contêm ponto (subdomínios)
-    SUBDOMAINS=$(grep -oP 'server_name\s+\K[^;]+' "$NGINX_CONF_FILE" | \
-                 tr ' ' '\n' | \
-                 grep -v "^$" | \
-                 grep -v "^\s*$" | \
-                 grep -v "^${SERVER_HOSTNAME}$" | \
-                 grep -v "^${SERVER_HOSTNAME}.${DOMAIN_SUFFIX}$" | \
-                 grep -v "^~" | \
-                 grep "\\." | \
-                 sed "s/\\.${SERVER_HOSTNAME}.${DOMAIN_SUFFIX}//" | \
-                 sed "s/\\.${SERVER_HOSTNAME}//" | \
-                 sort | uniq)
-    
-    # Remover entradas vazias ou inválidas
-    SUBDOMAINS=$(echo "$SUBDOMAINS" | grep -v "^\s*$" | grep -v "^${SERVER_HOSTNAME}" | grep -v "^localhost$")
-    
-    # Remover webmin se não estiver habilitado
-    if [[ "$ENABLE_WEBMIN" == false ]]; then
-        SUBDOMAINS=$(echo "$SUBDOMAINS" | grep -v "webmin")
-        echo -e "${YELLOW}⚠️  Webmin desabilitado - removendo dos certificados${NC}"
-    fi
-    
-    if [[ -z "$SUBDOMAINS" ]]; then
-        echo -e "${RED}❌ ERRO: Nenhum subdomínio encontrado na configuração do nginx${NC}"
-        echo -e "${YELLOW}📋 Verifique o arquivo: $NGINX_CONF_FILE${NC}"
-        echo -e "${YELLOW}📋 Conteúdo encontrado:${NC}"
-        grep -oP 'server_name\s+\K[^;]+' "$NGINX_CONF_FILE" | tr ' ' '\n'
-        exit 1
-    fi
-    
-    echo -e "${GREEN}✅ Subdomínios detectados:${NC}"
-    echo "$SUBDOMAINS" | while read sub; do
-        if [[ ! -z "$sub" ]]; then
-            echo "   - $sub.${SERVER_HOSTNAME}.${DOMAIN_SUFFIX}"
-            echo "   - $sub.${SERVER_HOSTNAME}"  # Sem .lan também
-        fi
-    done
 }
 
 # Função principal
 main() {
     parse_arguments "$@"
     
-    echo -e "${GREEN}🔐 Iniciando geração de certificados...${NC}"
-    echo -e "${GREEN}📅 Validade: 5 ANOS${NC}"
-    echo -e "${YELLOW}📝 IP do servidor: $SERVER_IP${NC}"
-    echo -e "${YELLOW}📝 Hostname: $SERVER_HOSTNAME${NC}"
-    echo -e "${YELLOW}📝 Domínio: $DOMAIN_SUFFIX${NC}"
-    echo -e "${YELLOW}🖥️  Webmin: $ENABLE_WEBMIN${NC}"
-    echo -e "${YELLOW}📁 Diretório do projeto: $PROJECT_DIR${NC}"
-    echo ""
+    log_info "🔐 Iniciando geração de certificados..."
+    log_info "   - Hostname: $SERVER_HOSTNAME"
+    log_info "   - Domínio: $DOMAIN_SUFFIX"
+    log_info "   - Webmin: $ENABLE_WEBMIN"
+    log_info "   - Diretório: $PROJECT_DIR"
 
-    # Extrair subdomínios automaticamente
-    extract_subdomains
+    # Definir subdomínios estaticamente
+    SUBDOMAINS="pihole ha komodo"
+    if [[ "$ENABLE_WEBMIN" == true ]]; then
+        SUBDOMAINS="$SUBDOMAINS webmin"
+    fi
 
     # Criar lista de Subject Alternative Names (SAN)
     SAN="DNS:${SERVER_HOSTNAME}, DNS:${SERVER_HOSTNAME}.${DOMAIN_SUFFIX}, DNS:localhost, IP:${SERVER_IP}"
-
-    # Adicionar todos os subdomínios detectados (COM e SEM .lan)
     for sub in $SUBDOMAINS; do
-        if [[ ! -z "$sub" ]]; then
-            # Com sufixo .lan
-            SAN="$SAN, DNS:${sub}.${SERVER_HOSTNAME}.${DOMAIN_SUFFIX}"
-            # Sem sufixo .lan
-            SAN="$SAN, DNS:${sub}.${SERVER_HOSTNAME}"
-        fi
+        SAN="$SAN, DNS:${sub}.${SERVER_HOSTNAME}.${DOMAIN_SUFFIX}"
+        SAN="$SAN, DNS:${sub}.${SERVER_HOSTNAME}"
     done
 
-    echo -e "${GREEN}📋 Subject Alternative Names configurados:${NC}"
+    log_info "📋 Subject Alternative Names configurados:"
     echo "$SAN" | tr ',' '\n' | sed 's/^ //' | sed 's/^/   /'
 
     # Criar diretório de certificados temporário
-    mkdir -p ~/certs && cd ~/certs
-    echo "📂 Diretório temporário criado: ~/certs"
+    TEMP_CERT_DIR=$(mktemp -d)
+    log_info "📂 Diretório temporário criado: $TEMP_CERT_DIR"
+    cd "$TEMP_CERT_DIR"
 
     # 1. Criar Autoridade Certificadora (CA)
-    echo "📋 Criando Autoridade Certificadora..."
-    openssl genrsa -out ca.key 2048
+    log_info "   - Criando Autoridade Certificadora (CA)..."
+    openssl genrsa -out ca.key 2048 > /dev/null 2>&1
     openssl req -x509 -new -nodes -key ca.key -sha256 -days $CA_DAYS -out ca.crt \
-      -subj "/CN=HomeServer Local CA/O=Home Network/C=BR"
+      -subj "/CN=HomeServer Local CA/O=Home Network/C=BR" > /dev/null 2>&1
 
     # 2. Criar certificado do servidor
-    echo "📋 Criando certificado do servidor..."
-    openssl genrsa -out homeserver.key 2048
+    log_info "   - Criando chave e certificado do servidor..."
+    openssl genrsa -out ${SERVER_HOSTNAME}.key 2048 > /dev/null 2>&1
 
     # Criar arquivo de configuração para SAN
     cat > openssl.cnf << EOF
@@ -189,71 +96,38 @@ main() {
 distinguished_name = req_distinguished_name
 req_extensions = v3_req
 prompt = no
-
 [req_distinguished_name]
 CN = ${SERVER_HOSTNAME}.${DOMAIN_SUFFIX}
-O = Home Server
-C = BR
-
 [v3_req]
-keyUsage = keyEncipherment, dataEncipherment, digitalSignature
-extendedKeyUsage = serverAuth
-subjectAltName = $SAN
+subjectAltName = @alt_names
+[alt_names]
+$(echo $SAN | sed 's/, /\\n/g' | sed 's/^/DNS.1 = /' | awk '{gsub(/DNS:/, "DNS."); print}' | nl -n rz -s " = " | sed 's/ //g')
 EOF
 
     # Gerar CSR com SAN
-    openssl req -new -key homeserver.key -out homeserver.csr -config openssl.cnf
+    openssl req -new -key ${SERVER_HOSTNAME}.key -out ${SERVER_HOSTNAME}.csr -config openssl.cnf > /dev/null 2>&1
 
     # Assinar certificado com SAN
-    openssl x509 -req -in homeserver.csr -CA ca.crt -CAkey ca.key -CAcreateserial \
-      -out homeserver.crt -days $SERVER_DAYS -sha256 -extensions v3_req -extfile openssl.cnf
+    openssl x509 -req -in ${SERVER_HOSTNAME}.csr -CA ca.crt -CAkey ca.key -CAcreateserial \
+      -out ${SERVER_HOSTNAME}.crt -days $SERVER_DAYS -sha256 -extfile openssl.cnf -extensions v3_req > /dev/null 2>&1
 
-    # 3. Limpar arquivos temporários
-    rm homeserver.csr openssl.cnf
-
-    # 4. Configurar permissões
-    chmod 600 ca.key homeserver.key
-    chmod 644 ca.crt homeserver.crt
-
-    # 5. Criar diretório SSL do nginx
-    echo "📂 Criando diretório SSL do nginx..."
+    # 3. Criar diretório SSL do nginx e mover arquivos
+    log_info "   - Copiando certificados para $NGINX_SSL_DIR..."
     mkdir -p "$NGINX_SSL_DIR"
-    chmod 755 "$NGINX_SSL_DIR"
-
-    # 6. Copiar certificados para o nginx
-    echo "📤 Movendo certificados para o nginx..."
-    cp homeserver.crt homeserver.key "$NGINX_SSL_DIR/"
+    
+    cp ${SERVER_HOSTNAME}.crt "$NGINX_SSL_DIR/"
+    cp ${SERVER_HOSTNAME}.key "$NGINX_SSL_DIR/"
     cp ca.crt "$NGINX_SSL_DIR/"
 
-    # 7. Ajustar permissões dos arquivos copiados
-    chmod 644 "$NGINX_SSL_DIR/homeserver.crt"
-    chmod 600 "$NGINX_SSL_DIR/homeserver.key"
-    chmod 644 "$NGINX_SSL_DIR/ca.crt"
+    # 4. Ajustar permissões
+    chmod 644 "$NGINX_SSL_DIR/"*.crt
+    chmod 600 "$NGINX_SSL_DIR/"*.key
+    
+    # 5. Limpar diretório temporário
+    rm -rf "$TEMP_CERT_DIR"
 
-    # 8. Ajustar ownership para o usuário daniel
-    if [[ $EUID -eq 0 ]]; then
-        chown -R daniel:daniel "$NGINX_SSL_DIR"
-        echo "👤 Permissões ajustadas para usuário daniel"
-    fi
-
-    # 9. Verificar certificado gerado
-    echo "🔍 Verificando certificado gerado..."
-    echo -e "${GREEN}✅ Domínios incluídos no certificado:${NC}"
-    openssl x509 -in homeserver.crt -noout -text | grep -A1 "Subject Alternative Name" | \
-        tail -1 | tr ',' '\n' | sed 's/^ *//' | sed 's/^/   /'
-
-    # 10. Verificar datas de expiração
-    CA_EXPIRY=$(openssl x509 -in ca.crt -noout -enddate | cut -d= -f2)
-    SERVER_EXPIRY=$(openssl x509 -in homeserver.crt -noout -enddate | cut -d= -f2)
-
-    echo ""
-    echo -e "${GREEN}✅ Certificados gerados e movidos com sucesso!${NC}"
-    echo ""
-    echo "📅 Datas de expiração:"
-    echo "   - CA: $CA_EXPIRY"
-    echo "   - Servidor: $SERVER_EXPIRY"
-    echo ""
-    echo -e "${GREEN}📁 Certificados disponíveis em: $NGINX_SSL_DIR/${NC}"
+    log_info "✅ Certificados gerados com sucesso!"
+    echo -e "${GREEN}📅 Validade do certificado do servidor: $(openssl x509 -in $NGINX_SSL_DIR/${SERVER_HOSTNAME}.crt -noout -enddate)${NC}"
 }
 
 main "$@"

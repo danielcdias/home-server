@@ -1,7 +1,7 @@
 # Redirecionamento HTTP para HTTPS
 server {
     listen 80;
-    server_name homeserver ~.homeserver;
+    server_name ${SERVER_HOSTNAME} ~.${SERVER_HOSTNAME};
     
     # Redirecionar tudo para HTTPS
     return 301 https://$host$request_uri;
@@ -10,11 +10,11 @@ server {
 # Servidor HTTPS para a página inicial
 server {
     listen 443 ssl;
-    server_name homeserver;
+    server_name ${SERVER_HOSTNAME};
     
     # Certificados
-    ssl_certificate /etc/nginx/ssl/homeserver.crt;
-    ssl_certificate_key /etc/nginx/ssl/homeserver.key;
+    ssl_certificate /etc/nginx/ssl/${SERVER_HOSTNAME}.crt;
+    ssl_certificate_key /etc/nginx/ssl/${SERVER_HOSTNAME}.key;
     
     # Configurações SSL
     ssl_protocols TLSv1.2 TLSv1.3;
@@ -25,13 +25,13 @@ server {
     index index.html;
 }
 
-# Proxy para o Pi-hole (pihole.homeserver)
+# Proxy para o Pi-hole (pihole.${SERVER_HOSTNAME}.${DOMAIN_SUFFIX})
 server {
     listen 443 ssl;
-    server_name pihole.homeserver;
+    server_name pihole.${SERVER_HOSTNAME}.${DOMAIN_SUFFIX};
     
-    ssl_certificate /etc/nginx/ssl/homeserver.crt;
-    ssl_certificate_key /etc/nginx/ssl/homeserver.key;
+    ssl_certificate /etc/nginx/ssl/${SERVER_HOSTNAME}.crt;
+    ssl_certificate_key /etc/nginx/ssl/${SERVER_HOSTNAME}.key;
     
     ssl_protocols TLSv1.2 TLSv1.3;
     ssl_ciphers ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-GCM-SHA384;
@@ -46,13 +46,13 @@ server {
     }
 }
 
-# Proxy para o Home Assistant (ha.homeserver)
+# Proxy para o Home Assistant (ha.${SERVER_HOSTNAME}.${DOMAIN_SUFFIX})
 server {
     listen 443 ssl;
-    server_name ha.homeserver;
+    server_name ha.${SERVER_HOSTNAME}.${DOMAIN_SUFFIX};
     
-    ssl_certificate /etc/nginx/ssl/homeserver.crt;
-    ssl_certificate_key /etc/nginx/ssl/homeserver.key;
+    ssl_certificate /etc/nginx/ssl/${SERVER_HOSTNAME}.crt;
+    ssl_certificate_key /etc/nginx/ssl/${SERVER_HOSTNAME}.key;
     
     ssl_protocols TLSv1.2 TLSv1.3;
     ssl_ciphers ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-GCM-SHA384;
@@ -71,13 +71,13 @@ server {
     }
 }
 
-# Proxy para o Komodo (komodo.homeserver)
+# Proxy para o Komodo (komodo.${SERVER_HOSTNAME}.${DOMAIN_SUFFIX})
 server {
     listen 443 ssl;
-    server_name komodo.homeserver;
+    server_name komodo.${SERVER_HOSTNAME}.${DOMAIN_SUFFIX};
     
-    ssl_certificate /etc/nginx/ssl/homeserver.crt;
-    ssl_certificate_key /etc/nginx/ssl/homeserver.key;
+    ssl_certificate /etc/nginx/ssl/${SERVER_HOSTNAME}.crt;
+    ssl_certificate_key /etc/nginx/ssl/${SERVER_HOSTNAME}.key;
     
     ssl_protocols TLSv1.2 TLSv1.3;
     ssl_ciphers ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-GCM-SHA384;
@@ -96,13 +96,13 @@ server {
     }
 }
 
-# Proxy para o Webmin (webmin.homeserver)
+# Proxy para o Webmin (webmin.${SERVER_HOSTNAME}.${DOMAIN_SUFFIX})
 server {
     listen 443 ssl;
-    server_name webmin.homeserver;
+    server_name webmin.${SERVER_HOSTNAME}.${DOMAIN_SUFFIX};
     
-    ssl_certificate /etc/nginx/ssl/homeserver.crt;
-    ssl_certificate_key /etc/nginx/ssl/homeserver.key;
+    ssl_certificate /etc/nginx/ssl/${SERVER_HOSTNAME}.crt;
+    ssl_certificate_key /etc/nginx/ssl/${SERVER_HOSTNAME}.key;
     
     ssl_protocols TLSv1.2 TLSv1.3;
     ssl_ciphers ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-GCM-SHA384;
@@ -129,4 +129,3 @@ server {
         proxy_redirect http://$host:10000/ https://$host/;
     }
 }
-

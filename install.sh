@@ -1,16 +1,15 @@
 #!/bin/bash
 
 # Configurações padrão
-DEFAULT_PROJECT_DIR="/home/daniel/home-server"
+DEFAULT_INSTALL_DIR="/opt/home-server"
 DEFAULT_HOSTNAME=$(hostname | cut -d'.' -f1)
 if [[ -z "$DEFAULT_HOSTNAME" || "$DEFAULT_HOSTNAME" == "localhost" ]]; then
     DEFAULT_HOSTNAME="homeserver"
 fi
 DEFAULT_DOMAIN_SUFFIX="lan"
 SERVICE_NAME="homeserver"
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-WEBMIN_CONFIG_DIR="/etc/webmin"
-WEBMIN_ALLOW_NETWORKS="172.20.0.0/24 10.1.1.0/24"
+# O diretório do script (onde o clone do git está)
+SOURCE_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 # Cores para output
 RED='\033[0;31m'
@@ -23,36 +22,26 @@ NC='\033[0m' # No Color
 show_usage() {
     echo "Uso: $0 [OPÇÕES]"
     echo "Opções:"
-    echo "  --path CAMINHO_DO_PROJETO    Diretório do projeto (padrão: $DEFAULT_PROJECT_DIR)"
-    echo "  --hostname NOME_DO_HOST      Nome do host (padrão: $DEFAULT_HOSTNAME)"
-    echo "  --domain-suffix SUFIXO       Sufixo do domínio (padrão: $DEFAULT_DOMAIN_SUFFIX)"
-    echo "  --non-interactive            Modo não interativo (usa padrões ou argumentos)"
-    echo "  --help, -h                   Mostrar esta ajuda"
+    echo "  --install-dir CAMINHO         Diretório de instalação final (padrão: $DEFAULT_INSTALL_DIR)"
+    echo "  --hostname NOME_DO_HOST       Nome do host (padrão: $DEFAULT_HOSTNAME)"
+    echo "  --domain-suffix SUFIXO        Sufixo do domínio (padrão: $DEFAULT_DOMAIN_SUFFIX)"
+    echo "  --non-interactive             Modo não interativo (usa padrões ou argumentos)"
+    echo "  --help, -h                    Mostrar esta ajuda"
     exit 1
 }
 
-# Função para log colorido
-log_info() {
-    echo -e "${GREEN}[INFO]${NC} $1"
-}
-
-log_warn() {
-    echo -e "${YELLOW}[WARN]${NC} $1"
-}
-
-log_error() {
-    echo -e "${RED}[ERROR]${NC} $1"
-}
+# Funções de log (log_info, log_warn, log_error)
+log_info() { echo -e "${GREEN}[INFO]${NC} $1"; }
+log_warn() { echo -e "${YELLOW}[WARN]${NC} $1"; }
+log_error() { echo -e "${RED}[ERROR]${NC} $1"; }
 
 # Função para prompt com valor padrão
 prompt_with_default() {
     local message="$1"
     local default_value="$2"
     local variable_name="$3"
-    
     echo -e "${BLUE}🤖 ${message}${NC}"
     read -p "$(echo -e "${BLUE}   (pressione ENTER para '${default_value}'): ${NC}")" user_input
-    
     if [[ -z "$user_input" ]]; then
         eval "$variable_name=\"$default_value\""
         echo -e "${GREEN}   ✅ Usando: ${default_value}${NC}"
@@ -66,7 +55,6 @@ prompt_with_default() {
 # Função para confirmar ação
 confirm_action() {
     local message="$1"
-    
     echo -e "${YELLOW}⚠️  ${message}${NC}"
     read -p "$(echo -e "${YELLOW}   Tem certeza que deseja continuar? (s/N): ${NC}")" -n 1 -r
     echo
@@ -76,152 +64,57 @@ confirm_action() {
     fi
 }
 
-# Função para verificar se Webmin está instalado
-check_webmin_installed() {
-    if systemctl is-active --quiet webmin 2>/dev/null || \
-       pgrep -x webmin >/dev/null 2>&1 || \
-       [[ -f /usr/share/webmin/miniserv.pl ]] || \
-       [[ -f /etc/webmin/miniserv.conf ]]; then
-        return 0  # Webmin está instalado
-    else
-        return 1  # Webmin não está instalado
-    fi
-}
-
 # Função para perguntar sobre Webmin
 prompt_webmin() {
     echo -e "${BLUE}🤖 Suporte ao Webmin${NC}"
-    echo -e "${BLUE}   O Webmin é uma interface web para administração do sistema${NC}"
-    
-    if check_webmin_installed; then
-        echo -e "${GREEN}   ✅ Webmin detectado no sistema${NC}"
-        read -p "$(echo -e "${BLUE}   Deseja configurar suporte ao Webmin? (S/n): ${NC}")" -n 1 -r
-        echo
-        if [[ $REPLY =~ ^[Nn]$ ]]; then
-            ENABLE_WEBMIN=false
-            echo -e "${YELLOW}   ⚠️  Suporte ao Webmin desabilitado${NC}"
-        else
-            ENABLE_WEBMIN=true
-            echo -e "${GREEN}   ✅ Suporte ao Webmin habilitado${NC}"
-        fi
+    read -p "$(echo -e "${BLUE}   Deseja habilitar o suporte ao Webmin (requer instalação se não existir)? (S/n): ${NC}")" -n 1 -r
+    echo
+    if [[ $REPLY =~ ^[Nn]$ ]]; then
+        ENABLE_WEBMIN=false
+        echo -e "${YELLOW}   ⚠️  Suporte ao Webmin desabilitado${NC}"
     else
-        echo -e "${YELLOW}   ⚠️  Webmin não encontrado no sistema${NC}"
-        read -p "$(echo -e "${BLUE}   Deseja instalar e configurar o Webmin? (s/N): ${NC}")" -n 1 -r
-        echo
-        if [[ $REPLY =~ ^[Ss]$ ]]; then
-            ENABLE_WEBMIN=true
-            echo -e "${GREEN}   ✅ Suporte ao Webmin habilitado (será instalado)${NC}"
-        else
-            ENABLE_WEBMIN=false
-            echo -e "${YELLOW}   ⚠️  Suporte ao Webmin desabilitado${NC}"
-        fi
+        ENABLE_WEBMIN=true
+        echo -e "${GREEN}   ✅ Suporte ao Webmin habilitado${NC}"
     fi
     echo
 }
 
-# Função para instalar Webmin se necessário
-install_webmin_if_needed() {
-    if [[ "$ENABLE_WEBMIN" == true ]] && ! check_webmin_installed; then
-        echo -e "${BLUE}🤖 Instalando Webmin...${NC}"
-        
-        # Verificar distribuição
-        if [[ -f /etc/debian_version ]]; then
-            # Debian/Ubuntu
-            echo -e "${GREEN}   Detectado Debian/Ubuntu${NC}"
-            apt-get update
-            apt-get install -y webmin
-        elif [[ -f /etc/redhat-release ]]; then
-            # RHEL/CentOS
-            echo -e "${GREEN}   Detectado RHEL/CentOS${NC}"
-            # Adicionar repositório do Webmin
-            cat > /etc/yum.repos.d/webmin.repo << EOF
-[Webmin]
-name=Webmin Distribution Neutral
-baseurl=https://download.webmin.com/download/yum
-enabled=1
-gpgcheck=1
-gpgkey=https://download.webmin.com/jcameron-key.asc
-EOF
-            yum install -y webmin
-        else
-            echo -e "${YELLOW}   ⚠️  Distribuição não suportada para instalação automática do Webmin${NC}"
-            echo -e "${YELLOW}   Instale o Webmin manualmente e execute novamente o script${NC}"
-            ENABLE_WEBMIN=false
-            return 1
-        fi
-        
-        if systemctl is-active --quiet webmin; then
-            echo -e "${GREEN}   ✅ Webmin instalado e iniciado com sucesso${NC}"
-        else
-            echo -e "${YELLOW}   ⚠️  Webmin instalado mas não iniciado. Iniciando...${NC}"
-            systemctl start webmin
-            systemctl enable webmin
-        fi
-    fi
-}
-
 # Função para parsear argumentos
 parse_arguments() {
-    local non_interactive=false
-    PROJECT_DIR="$DEFAULT_PROJECT_DIR"
+    INSTALL_DIR="$DEFAULT_INSTALL_DIR"
     SERVER_HOSTNAME="$DEFAULT_HOSTNAME"
     DOMAIN_SUFFIX="$DEFAULT_DOMAIN_SUFFIX"
-    ENABLE_WEBMIN=true  # Padrão é true
+    ENABLE_WEBMIN=true
+    local non_interactive=false
     
     while [[ $# -gt 0 ]]; do
         case $1 in
-            --path)
-                PROJECT_DIR="$2"
-                shift 2
-                ;;
-            --hostname)
-                SERVER_HOSTNAME="$2"
-                shift 2
-                ;;
-            --domain-suffix)
-                DOMAIN_SUFFIX="$2"
-                shift 2
-                ;;
-            --non-interactive)
-                non_interactive=true
-                shift
-                ;;
-            --help|-h)
-                show_usage
-                ;;
-            *)
-                log_error "Argumento desconhecido: $1"
-                show_usage
-                ;;
+            --install-dir) INSTALL_DIR="$2"; shift 2 ;;
+            --hostname) SERVER_HOSTNAME="$2"; shift 2 ;;
+            --domain-suffix) DOMAIN_SUFFIX="$2"; shift 2 ;;
+            --non-interactive) non_interactive=true; shift ;;
+            --help|-h) show_usage ;;
+            *) log_error "Argumento desconhecido: $1"; show_usage ;;
         esac
     done
     
-    # Modo interativo se não for non-interactive
     if [[ "$non_interactive" == false ]]; then
-        echo -e "${GREEN}"
-        echo "=========================================="
-        echo "    CONFIGURAÇÃO INTERATIVA DO HOME SERVER"
-        echo "=========================================="
-        echo -e "${NC}"
+        echo -e "${GREEN}==========================================${NC}"
+        echo -e "${GREEN}    CONFIGURAÇÃO INTERATIVA DO HOME SERVER    ${NC}"
+        echo -e "${GREEN}==========================================${NC}\n"
         
-        prompt_with_default "Informe o caminho completo da pasta do projeto" "$DEFAULT_PROJECT_DIR" "PROJECT_DIR"
-        prompt_with_default "Informe o nome do host desta máquina para ser usado como domínio" "$DEFAULT_HOSTNAME" "SERVER_HOSTNAME"
-        prompt_with_default "Informe o sufixo do domínio (local, lan, home, etc.)" "$DEFAULT_DOMAIN_SUFFIX" "DOMAIN_SUFFIX"
-        
-        # Perguntar sobre Webmin
+        prompt_with_default "Informe o diretório de instalação final" "$DEFAULT_INSTALL_DIR" "INSTALL_DIR"
+        prompt_with_default "Informe o nome do host (domínio principal)" "$DEFAULT_HOSTNAME" "SERVER_HOSTNAME"
+        prompt_with_default "Informe o sufixo do domínio (lan, local, etc.)" "$DEFAULT_DOMAIN_SUFFIX" "DOMAIN_SUFFIX"
         prompt_webmin
         
         echo -e "${GREEN}📋 Resumo da configuração:${NC}"
-        echo -e "   📁 Diretório: ${GREEN}$PROJECT_DIR${NC}"
+        echo -e "   📦 Diretório de instalação: ${GREEN}$INSTALL_DIR${NC}"
         echo -e "   🌐 Hostname: ${GREEN}$SERVER_HOSTNAME${NC}"
-        echo -e "   🔗 Domínio: ${GREEN}$SERVER_HOSTNAME.$DOMAIN_SUFFIX${NC}"
-        echo -e "   🖥️  Webmin: ${GREEN}$([[ "$ENABLE_WEBMIN" == true ]] && echo "Habilitado" || echo "Desabilitado")${NC}"
-        echo
+        echo -e "   🔗 Domínio Completo: ${GREEN}$SERVER_HOSTNAME.$DOMAIN_SUFFIX${NC}"
+        echo -e "   🖥️  Webmin: ${GREEN}$([[ "$ENABLE_WEBMIN" == true ]] && echo "Habilitado" || echo "Desabilitado")${NC}\n"
         
-        confirm_action "Esta configuração será aplicada em todos os arquivos do projeto."
-    else
-        log_info "Modo não interativo ativado"
-        log_info "Configuração: Path=$PROJECT_DIR, Hostname=$SERVER_HOSTNAME, Domínio=$DOMAIN_SUFFIX"
+        confirm_action "O projeto será instalado e configurado no diretório de destino."
     fi
     
     SERVICE_FILE="/etc/systemd/system/${SERVICE_NAME}.service"
@@ -235,354 +128,127 @@ check_root() {
     fi
 }
 
-# Função para detectar o comando docker compose correto
-detect_docker_compose() {
-    if command -v docker > /dev/null && docker compose version > /dev/null 2>&1; then
-        echo "docker compose"
-    elif command -v docker-compose > /dev/null; then
-        echo "docker-compose"
-    else
-        log_error "Docker Compose não está instalado!"
-        exit 1
-    fi
+# Função para verificar dependências
+check_dependencies() {
+    log_info "Verificando dependências..."
+    if ! command -v docker &> /dev/null; then log_error "Docker não está instalado!"; exit 1; fi
+    if ! command -v docker-compose &> /dev/null && ! (command -v docker &> /dev/null && docker compose version &> /dev/null); then log_error "Docker Compose não está instalado!"; exit 1; fi
+    if ! command -v openssl &> /dev/null; then log_error "OpenSSL não está instalado!"; exit 1; fi
+    log_info "Dependências verificadas."
 }
 
-# Função para verificar se o diretório do projeto existe
-check_project_dir() {
-    if [[ ! -d "$PROJECT_DIR" ]]; then
-        log_error "Diretório do projeto não encontrado: $PROJECT_DIR"
-        exit 1
+# Função para preparar o diretório de instalação
+prepare_install_dir() {
+    log_info "Preparando diretório de instalação: $INSTALL_DIR"
+    if [ -d "$INSTALL_DIR" ]; then
+        log_warn "O diretório de instalação já existe."
+        confirm_action "Isso pode sobrescrever arquivos existentes. Deseja continuar?"
     fi
-    log_info "Diretório do projeto: $PROJECT_DIR"
+    mkdir -p "$INSTALL_DIR" || { log_error "Falha ao criar diretório de instalação!"; exit 1; }
+    
+    log_info "Copiando arquivos do projeto de $SOURCE_DIR para $INSTALL_DIR..."
+    # Usar rsync para mais controle e para excluir o próprio diretório git
+    rsync -av --progress "$SOURCE_DIR/" "$INSTALL_DIR/" --exclude ".git" --exclude ".gitignore"
+    
+    # Criar diretórios que podem não existir no fonte mas são necessários no runtime
+    mkdir -p "$INSTALL_DIR/runtime_config/etc-pihole"
+    mkdir -p "$INSTALL_DIR/runtime_config/home-assistant/config"
+    log_info "Diretório de instalação preparado com sucesso."
 }
 
-# Função para verificar se os scripts de start/stop existem
-check_service_scripts() {
-    if [[ ! -f "$PROJECT_DIR/start-service.sh" ]]; then
-        log_error "Script de start não encontrado: $PROJECT_DIR/start-service.sh"
-        exit 1
-    fi
+# Função para gerar o arquivo de configuração .env
+generate_config_env() {
+    local config_file="$1/config.env"
+    log_info "Gerando arquivo de configuração de ambiente em $config_file"
     
-    if [[ ! -f "$PROJECT_DIR/stop-service.sh" ]]; then
-        log_error "Script de stop não encontrado: $PROJECT_DIR/stop-service.sh"
-        exit 1
-    fi
-    
-    chmod +x "$PROJECT_DIR/start-service.sh" "$PROJECT_DIR/stop-service.sh"
-    log_info "Scripts de serviço verificados e tornados executáveis"
+    cat > "$config_file" << EOF
+# Este arquivo é gerado automaticamente pelo install.sh
+# Não edite manualmente, pois suas alterações serão perdidas na próxima instalação.
+
+# Configurações de Domínio e Rede
+SERVER_HOSTNAME=$SERVER_HOSTNAME
+DOMAIN_SUFFIX=$DOMAIN_SUFFIX
+NGINX_IPV4=172.20.0.100
+
+# Configurações de Componentes
+ENABLE_WEBMIN=$ENABLE_WEBMIN
+EOF
+    log_info "✅ Arquivo config.env gerado."
 }
 
-# Função para configurar Webmin
-configure_webmin() {
-    log_info "Configurando Webmin para aceitar conexões do proxy..."
-    
-    # Verificar se Webmin está instalado
-    if [[ ! -d "$WEBMIN_CONFIG_DIR" ]]; then
-        log_warn "Webmin não está instalado. Pulando configuração do Webmin."
-        return 0
-    fi
-    
-    # Backup dos arquivos originais
-    backup_timestamp=$(date +%Y%m%d_%H%M%S)
-    if [[ -f "$WEBMIN_CONFIG_DIR/config" ]]; then
-        cp "$WEBMIN_CONFIG_DIR/config" "$WEBMIN_CONFIG_DIR/config.backup_$backup_timestamp"
-    fi
-    if [[ -f "$WEBMIN_CONFIG_DIR/miniserv.conf" ]]; then
-        cp "$WEBMIN_CONFIG_DIR/miniserv.conf" "$WEBMIN_CONFIG_DIR/miniserv.conf.backup_$backup_timestamp"
-    fi
-    
-    # Configurar /etc/webmin/config - MODIFICAÇÃO APENAS DAS CONFIGURAÇÕES NECESSÁRIAS
-    if [[ -f "$WEBMIN_CONFIG_DIR/config" ]]; then
-        # Atualizar ou adicionar configurações específicas
-        if ! grep -q "^allow=" "$WEBMIN_CONFIG_DIR/config"; then
-            echo "allow=$WEBMIN_ALLOW_NETWORKS" >> "$WEBMIN_CONFIG_DIR/config"
-        else
-            sed -i "s/^allow=.*/allow=$WEBMIN_ALLOW_NETWORKS/" "$WEBMIN_CONFIG_DIR/config"
-        fi
-        
-        if ! grep -q "^referers=" "$WEBMIN_CONFIG_DIR/config"; then
-            echo "referers=webmin.homeserver" >> "$WEBMIN_CONFIG_DIR/config"
-        else
-            sed -i "s/^referers=.*/referers=webmin.homeserver/" "$WEBMIN_CONFIG_DIR/config"
-        fi
-        
-        if ! grep -q "^noreferers=" "$WEBMIN_CONFIG_DIR/config"; then
-            echo "noreferers=*" >> "$WEBMIN_CONFIG_DIR/config"
-        else
-            sed -i "s/^noreferers=.*/noreferers=*/" "$WEBMIN_CONFIG_DIR/config"
-        fi
-        
-        if ! grep -q "^ssl_redirect=" "$WEBMIN_CONFIG_DIR/config"; then
-            echo "ssl_redirect=0" >> "$WEBMIN_CONFIG_DIR/config"
-        else
-            sed -i "s/^ssl_redirect=.*/ssl_redirect=0/" "$WEBMIN_CONFIG_DIR/config"
-        fi
-        
-        if ! grep -q "^no_ssl_redirect=" "$WEBMIN_CONFIG_DIR/config"; then
-            echo "no_ssl_redirect=1" >> "$WEBMIN_CONFIG_DIR/config"
-        else
-            sed -i "s/^no_ssl_redirect=.*/no_ssl_redirect=1/" "$WEBMIN_CONFIG_DIR/config"
-        fi
-        
-        # Remover configurações conflitantes se existirem
-        sed -i '/^webprefix=/d' "$WEBMIN_CONFIG_DIR/config"
-        sed -i '/^relative_links=/d' "$WEBMIN_CONFIG_DIR/config"
-        
-    else
-        log_error "Arquivo config não encontrado!"
-        return 1
-    fi
-    
-    # Configurar /etc/webmin/miniserv.conf (já está correto)
-    if [[ -f "$WEBMIN_CONFIG_DIR/miniserv.conf" ]]; then
-        # Remover configurações SSL problemáticas
-        sed -i '/^ssl=/d' "$WEBMIN_CONFIG_DIR/miniserv.conf"
-        sed -i '/^ssl_keyfile=/d' "$WEBMIN_CONFIG_DIR/miniserv.conf"
-        sed -i '/^ssl_certfile=/d' "$WEBMIN_CONFIG_DIR/miniserv.conf"
-        sed -i '/^ssl_enforce=/d' "$WEBMIN_CONFIG_DIR/miniserv.conf"
-        sed -i '/^ssl_hsts=/d' "$WEBMIN_CONFIG_DIR/miniserv.conf"
-        sed -i '/^no_trust_ssl=/d' "$WEBMIN_CONFIG_DIR/miniserv.conf"
-        
-        # Adicionar/atualizar configurações necessárias
-        if ! grep -q "^allow=" "$WEBMIN_CONFIG_DIR/miniserv.conf"; then
-            echo "allow=$WEBMIN_ALLOW_NETWORKS" >> "$WEBMIN_CONFIG_DIR/miniserv.conf"
-        else
-            sed -i "s/^allow=.*/allow=$WEBMIN_ALLOW_NETWORKS/" "$WEBMIN_CONFIG_DIR/miniserv.conf"
-        fi
-        
-        if ! grep -q "^referers=" "$WEBMIN_CONFIG_DIR/miniserv.conf"; then
-            echo "referers=webmin.homeserver" >> "$WEBMIN_CONFIG_DIR/miniserv.conf"
-        else
-            sed -i "s/^referers=.*/referers=webmin.homeserver/" "$WEBMIN_CONFIG_DIR/miniserv.conf"
-        fi
-        
-        if ! grep -q "^trust_real_ip=" "$WEBMIN_CONFIG_DIR/miniserv.conf"; then
-            echo "trust_real_ip=1" >> "$WEBMIN_CONFIG_DIR/miniserv.conf"
-        else
-            sed -i "s/^trust_real_ip=.*/trust_real_ip=1/" "$WEBMIN_CONFIG_DIR/miniserv.conf"
-        fi
-        
-        if ! grep -q "^trusted_proxies=" "$WEBMIN_CONFIG_DIR/miniserv.conf"; then
-            echo "trusted_proxies=172.20.0.100" >> "$WEBMIN_CONFIG_DIR/miniserv.conf"
-        else
-            sed -i "s/^trusted_proxies=.*/trusted_proxies=172.20.0.100/" "$WEBMIN_CONFIG_DIR/miniserv.conf"
-        fi
-        
-        # Garantir bind correto
-        sed -i 's/^bind=.*/bind=0.0.0.0/' "$WEBMIN_CONFIG_DIR/miniserv.conf"
-        
-    else
-        log_error "Arquivo miniserv.conf não encontrado!"
-        return 1
-    fi
-    
-    log_info "Configuração do Webmin atualizada com sucesso"
-    log_info "Redes permitidas: $WEBMIN_ALLOW_NETWORKS"
-    
-    # Reiniciar Webmin se estiver rodando
-    if systemctl is-active --quiet webmin; then
-        log_info "Reiniciando Webmin para aplicar configurações..."
-        systemctl restart webmin
-        if [[ $? -eq 0 ]]; then
-            log_info "Webmin reiniciado com sucesso"
-        else
-            log_warn "Falha ao reiniciar Webmin. Reinicie manualmente: systemctl restart webmin"
-        fi
-    fi
-    
-    return 0
-}
+# Função para processar templates
+process_templates() {
+    log_info "Processando arquivos de template..."
 
-# Função para atualizar arquivos de configuração (CORRIGIDA)
-update_config_files() {
-    local project_dir="$1"
-    local hostname="$2"
-    local domain_suffix="$3"
-    
-    log_info "Atualizando arquivos de configuração..."
-    
-    # 1. Atualizar generate-certs.sh
-    if [[ -f "$project_dir/generate-certs.sh" ]]; then
-        sed -i "s/SERVER_HOSTNAME=.*/SERVER_HOSTNAME=\"$hostname\"/" "$project_dir/generate-certs.sh"
-        sed -i "s/DOMAIN_SUFFIX=.*/DOMAIN_SUFFIX=\"$domain_suffix\"/" "$project_dir/generate-certs.sh"
-        
-        # Atualizar suporte a Webmin no generate-certs.sh
-        if [[ "$ENABLE_WEBMIN" == true ]]; then
-            sed -i "s/ENABLE_WEBMIN=.*/ENABLE_WEBMIN=true/" "$project_dir/generate-certs.sh"
-        else
-            sed -i "s/ENABLE_WEBMIN=.*/ENABLE_WEBMIN=false/" "$project_dir/generate-certs.sh"
-        fi
-        
-        log_info "✅ generate-certs.sh atualizado"
-    fi
-    
-    # 2. Atualizar docker-compose.yaml (Pi-hole DNS) - CORREÇÃO: apenas hostname sem sufixo
-    if [[ -f "$project_dir/docker-compose.yaml" ]]; then
-        sed -i "s|address=/[a-zA-Z0-9_\-]*/|address=/$hostname/|g" "$project_dir/docker-compose.yaml"
-        log_info "✅ docker-compose.yaml atualizado"
-    fi
-    
-    # 3. Atualizar nginx/reverse-proxy.conf (com suporte opcional ao Webmin) - CORREÇÃO: remover completamente
-    if [[ -f "$project_dir/nginx/reverse-proxy.conf" ]]; then
-        # Atualizar apenas os domínios nos lugares específicos:
-        
-        # 1. No primeiro bloco server (redirecionamento HTTP) - substituir apenas o hostname
-        sed -i "0,/server_name [a-zA-Z0-9_\-]* ~\.[a-zA-Z0-9_\-]*;/s/server_name [a-zA-Z0-9_\-]* ~\.[a-zA-Z0-9_\-]*;/server_name $hostname ~.$hostname;/" "$project_dir/nginx/reverse-proxy.conf"
-        
-        # 2. No segundo bloco server (página inicial) - substituir apenas o hostname
-        sed -i "/# Servidor HTTPS para a página inicial/,/server_name [a-zA-Z0-9_\-]*;/s/server_name [a-zA-Z0-9_\-]*;/server_name $hostname;/" "$project_dir/nginx/reverse-proxy.conf"
-        
-        # 3. Nos blocos de proxy (pihole, ha, komodo, webmin) - substituir apenas a parte do domínio
-        sed -i "s/\(server_name \)[a-zA-Z0-9_\-]*\.lan;/\1$hostname.$domain_suffix;/g" "$project_dir/nginx/reverse-proxy.conf"
-        
-        # 4. Remover bloco do Webmin se desabilitado
-        if [[ "$ENABLE_WEBMIN" == false ]]; then
-            # Remover bloco completo do Webmin de forma mais precisa
-            webmin_start_line=$(grep -n "# Proxy para o Webmin" "$project_dir/nginx/reverse-proxy.conf" | cut -d: -f1)
-            if [[ -n "$webmin_start_line" ]]; then
-                # Encontrar a linha de fechamento do bloco (a próxima } após o início)
-                webmin_end_line=$(awk -v start="$webmin_start_line" 'NR >= start && /^}$/ {print NR; exit}' "$project_dir/nginx/reverse-proxy.conf")
-                
-                if [[ -n "$webmin_end_line" ]]; then
-                    # Remover o bloco do Webmin
-                    sed -i "${webmin_start_line},${webmin_end_line}d" "$project_dir/nginx/reverse-proxy.conf"
-                    log_info "✅ nginx/reverse-proxy.conf atualizado (sem Webmin)"
-                else
-                    log_warn "Não foi possível encontrar o fim do bloco do Webmin"
-                fi
-            else
-                log_warn "Bloco do Webmin não encontrado no arquivo"
-            fi
-        else
-            log_info "✅ nginx/reverse-proxy.conf atualizado (com Webmin)"
-        fi
-    fi
-    
-    # 4. Atualizar nginx/html/index.html - CORREÇÃO: remover link do Webmin se desabilitado
-    if [[ -f "$project_dir/nginx/html/index.html" ]]; then
-        sed -i "s/homeserver/$hostname/g" "$project_dir/nginx/html/index.html"
-        sed -i "s/homeserver\.lan/$hostname.$domain_suffix/g" "$project_dir/nginx/html/index.html"
-        
+    # Processar index.html.tpl -> index.html
+    local index_tpl="$INSTALL_DIR/nginx/html/index.html.tpl"
+    local index_html="$INSTALL_DIR/nginx/html/index.html"
+    if [[ -f "$index_tpl" ]]; then
+        # Substituir placeholders de domínio
+        sed "s/{{SERVER_HOSTNAME}}/$SERVER_HOSTNAME/g; s/{{DOMAIN_SUFFIX}}/$DOMAIN_SUFFIX/g" "$index_tpl" > "$index_html"
         # Remover link do Webmin se desabilitado
         if [[ "$ENABLE_WEBMIN" == false ]]; then
-            sed -i '/<li><a href="http:\/\/webmin\..*" target="_blank">Webmin<\/a><\/li>/d' "$project_dir/nginx/html/index.html"
+            sed -i '/webmin/d' "$index_html"
         fi
-        
-        log_info "✅ nginx/html/index.html atualizado"
+        log_info "✅ Template nginx/html/index.html.tpl processado."
     fi
-    
-    # 5. Configurar Webmin se habilitado
-    if [[ "$ENABLE_WEBMIN" == true ]]; then
-        configure_webmin
+
+    # Processar reverse-proxy.conf.tpl
+    # O processamento final será feito pelo envsubst no contêiner,
+    # mas removemos o bloco do Webmin aqui se necessário.
+    local nginx_tpl="$INSTALL_DIR/nginx/reverse-proxy.conf.tpl"
+    if [[ "$ENABLE_WEBMIN" == false && -f "$nginx_tpl" ]]; then
+        # Usar awk para remover o bloco do Webmin de forma segura
+        awk '/# Proxy para o Webmin/,/}/ {next} 1' "$nginx_tpl" > "${nginx_tpl}.tmp" && mv "${nginx_tpl}.tmp" "$nginx_tpl"
+        log_info "✅ Bloco do Webmin removido de nginx/reverse-proxy.conf.tpl."
     fi
 }
 
-# Função para criar arquivo de serviço dinamicamente
+# Função para criar o arquivo de serviço
 create_service_file() {
-    local service_file="$1"
-    local project_dir="$2"
+    log_info "Criando arquivo de serviço em: $SERVICE_FILE"
     
-    log_info "Criando arquivo de serviço em: $service_file"
-    
-    cat > "$service_file" << EOF
+    cat > "$SERVICE_FILE" << EOF
 [Unit]
-Description=Home Server
+Description=Home Server Docker Compose Service
 Requires=docker.service
 After=docker.service
 
 [Service]
 Type=oneshot
 RemainAfterExit=yes
-WorkingDirectory=$project_dir
-ExecStart=$project_dir/start-service.sh --path "$project_dir"
-ExecStop=$project_dir/stop-service.sh --path "$project_dir"
+WorkingDirectory=$INSTALL_DIR
+ExecStart=/usr/bin/docker compose up -d
+ExecStop=/usr/bin/docker compose down
 TimeoutStartSec=0
 
 [Install]
 WantedBy=multi-user.target
 EOF
-
-    if [[ $? -eq 0 ]]; then
-        log_info "Arquivo de serviço criado com sucesso"
-        chmod 644 "$service_file"
-    else
-        log_error "Falha ao criar arquivo de serviço!"
-        exit 1
-    fi
+    chmod 644 "$SERVICE_FILE"
+    log_info "Arquivo de serviço criado."
 }
 
-# Função para configurar o serviço
+# Função para configurar e habilitar o serviço
 setup_service() {
     log_info "Configurando serviço systemd..."
-    
-    systemctl daemon-reload || { log_error "Falha ao recarregar systemd!"; exit 1; }
-    systemctl enable "$SERVICE_NAME" || { log_error "Falha ao habilitar serviço!"; exit 1; }
-    
-    log_info "Serviço habilitado para inicialização automática"
+    systemctl daemon-reload
+    systemctl enable "$SERVICE_NAME"
+    log_info "Serviço $SERVICE_NAME habilitado para inicialização automática."
 }
 
 # Função para gerar certificados
 generate_certificates() {
+    local cert_script="$INSTALL_DIR/generate-certs.sh"
+    if [[ ! -f "$cert_script" ]]; then
+        log_error "Script generate-certs.sh não encontrado em $INSTALL_DIR";
+        exit 1;
+    fi
+    
     log_info "Gerando certificados SSL..."
-    
-    cd "$PROJECT_DIR" || exit 1
-    
-    if [[ ! -f "generate-certs.sh" ]]; then
-        log_error "Script generate-certs.sh não encontrado em $PROJECT_DIR"
-        exit 1
-    fi
-    
-    chmod +x generate-certs.sh
-    ./generate-certs.sh --path "$PROJECT_DIR" --hostname "$SERVER_HOSTNAME" --domain-suffix "$DOMAIN_SUFFIX" --webmin "$ENABLE_WEBMIN"
-    
-    if [[ $? -eq 0 ]]; then
-        log_info "Certificados gerados com sucesso!"
-    else
-        log_error "Falha ao gerar certificados!"
-        exit 1
-    fi
-}
-
-# Função para verificar dependências
-check_dependencies() {
-    log_info "Verificando dependências..."
-    
-    if ! command -v docker &> /dev/null; then
-        log_error "Docker não está instalado!"
-        exit 1
-    fi
-    
-    DOCKER_COMPOSE_CMD=$(detect_docker_compose)
-    log_info "Comando Docker Compose detectado: $DOCKER_COMPOSE_CMD"
-    
-    if ! command -v openssl &> /dev/null; then
-        log_error "OpenSSL não está instalado!"
-        exit 1
-    fi
-    
-    log_info "Todas as dependências verificadas com sucesso"
-}
-
-# Função para mostrar resumo da instalação
-show_summary() {
-    echo ""
-    log_info "=== INSTALAÇÃO CONCLUÍDA ==="
-    log_info "Projeto: $PROJECT_DIR"
-    log_info "Hostname: $SERVER_HOSTNAME"
-    log_info "Domínio: $SERVER_HOSTNAME.$DOMAIN_SUFFIX"
-    log_info "Webmin: $([[ "$ENABLE_WEBMIN" == true ]] && echo "Habilitado" || echo "Desabilitado")"
-    log_info "Serviço: $SERVICE_NAME"
-    log_info "Arquivo de serviço: $SERVICE_FILE"
-    log_info "Docker Compose: $DOCKER_COMPOSE_CMD"
-    echo ""
-    log_info "Comandos úteis:"
-    log_info "  Iniciar serviço: systemctl start $SERVICE_NAME"
-    log_info "  Parar serviço: systemctl stop $SERVICE_NAME"
-    log_info "  Status: systemctl status $SERVICE_NAME"
-    echo ""
-    log_info "Acesse: https://$SERVER_HOSTNAME.$DOMAIN_SUFFIX"
-    log_info "Certificados em: $PROJECT_DIR/nginx/ssl/"
-    echo ""
+    chmod +x "$cert_script"
+    # Passar todos os parâmetros para o script de certificados
+    "$cert_script" --path "$INSTALL_DIR" --hostname "$SERVER_HOSTNAME" --domain-suffix "$DOMAIN_SUFFIX" --webmin "$ENABLE_WEBMIN"
 }
 
 # Função principal
@@ -590,25 +256,34 @@ main() {
     check_root
     parse_arguments "$@"
     check_dependencies
-    check_project_dir
-    check_service_scripts
     
-    # Instalar Webmin se necessário
-    install_webmin_if_needed
+    prepare_install_dir
+    generate_config_env "$INSTALL_DIR"
+    process_templates
+
+    # Verificar se o .env principal existe e alertar o usuário
+    if [[ ! -f "$INSTALL_DIR/.env" ]]; then
+        log_warn "Arquivo .env com segredos não encontrado em $INSTALL_DIR."
+        log_warn "Copie o .env.example para .env e preencha as senhas antes de iniciar o serviço."
+    fi
     
-    # Atualizar arquivos de configuração com o hostname e domínio
-    update_config_files "$PROJECT_DIR" "$SERVER_HOSTNAME" "$DOMAIN_SUFFIX"
-    
-    # Criar arquivo de serviço dinamicamente
-    create_service_file "$SERVICE_FILE" "$PROJECT_DIR"
+    # Opcional: Instalar e configurar Webmin aqui se necessário
+    # if [[ "$ENABLE_WEBMIN" == true ]]; then ... fi
+
+    create_service_file
     setup_service
     generate_certificates
     
-    show_summary
-    
-    log_info "Instalação concluída com sucesso! 🚀"
-    log_warn "Execute 'systemctl start $SERVICE_NAME' para iniciar os serviços"
+    echo ""
+    log_info "=== INSTALAÇÃO CONCLUÍDA ==="
+    log_info "Os arquivos de execução estão em: $INSTALL_DIR"
+    log_info "A configuração do ambiente está em: $INSTALL_DIR/config.env"
+    log_info "Lembre-se de configurar os segredos em: $INSTALL_DIR/.env"
+    log_info "Serviço systemd '$SERVICE_NAME' foi criado e habilitado."
+    echo ""
+    log_warn "Execute 'systemctl start $SERVICE_NAME' para iniciar os serviços."
+    log_info "Acesse o dashboard em: https://$SERVER_HOSTNAME.$DOMAIN_SUFFIX"
+    log_info "Instalação finalizada com sucesso! 🚀"
 }
 
 main "$@"
-

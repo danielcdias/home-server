@@ -12,8 +12,14 @@ services:
     volumes:
       - mongo-data:/data/db
       - mongo-config:/data/configdb
-    env_file: ./komodo/compose.env
+    env_file:
+      # CORREÇÃO: Ordem de arquivos .env ajustada para incluir o específico do Komodo
+      - .env
+      - config.env
+      - ./komodo/compose.env
     environment:
+      # As variáveis do compose.env já definem os usuários e senhas do Komodo.
+      # Se elas não estiverem lá, o docker-compose usará os valores abaixo como fallback.
       MONGO_INITDB_ROOT_USERNAME: ${KOMODO_DB_USERNAME:-komodo}
       MONGO_INITDB_ROOT_PASSWORD: ${KOMODO_DB_PASSWORD:-komodo}
     networks:
@@ -28,7 +34,11 @@ services:
     restart: unless-stopped
     depends_on:
       - komodo-mongo
-    env_file: ./komodo/compose.env
+    env_file:
+      # CORREÇÃO: Ordem de arquivos .env ajustada para incluir o específico do Komodo
+      - .env
+      - config.env
+      - ./komodo/compose.env
     environment:
       KOMODO_DATABASE_ADDRESS: komodo-mongo:27017
       KOMODO_DATABASE_USERNAME: ${KOMODO_DB_USERNAME:-komodo}
@@ -53,7 +63,11 @@ services:
     labels:
       komodo.skip:
     restart: unless-stopped
-    env_file: ./komodo/compose.env
+    env_file:
+      # CORREÇÃO: Ordem de arquivos .env ajustada para incluir o específico do Komodo
+      - .env
+      - config.env
+      - ./komodo/compose.env
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
       - /proc:/proc
@@ -71,6 +85,7 @@ services:
       - "5432:5432"
     env_file:
       - .env
+      - config.env
     volumes:
       - postgres_data:/var/lib/postgresql/data
     networks:
@@ -92,12 +107,13 @@ services:
       - "53:53/udp"
     env_file:
       - .env
+      - config.env
     environment:
       TZ: ${TZ:-America/Sao_Paulo}
       FTLCONF_webserver_api_password: ${PIHOLE_WEB_PASSWORD:-changeme}
       FTLCONF_dns_listeningMode: 'all'
       FTLCONF_misc_etc_dnsmasq_d: 'true'
-      FTLCONF_misc_dnsmasq_lines: "address=/homeserver/172.20.0.100"
+      FTLCONF_misc_dnsmasq_lines: "address=/${SERVER_HOSTNAME}/${NGINX_IPV4}"
     volumes:
       - ./runtime_config/etc-pihole:/etc/pihole
     networks:
@@ -122,6 +138,7 @@ services:
       - ./home-assistant/docker-entrypoint.sh:/docker-entrypoint.sh
     env_file:
       - .env
+      - config.env
     environment:
       - HA_TZ=${TZ:-America/Sao_Paulo}
     networks:
@@ -148,12 +165,16 @@ services:
       - "80:80"
       - "443:443"
     volumes:
-      - ./nginx/reverse-proxy.conf:/etc/nginx/conf.d/reverse-proxy.conf:ro
+      - ./nginx/reverse-proxy.conf.tpl:/etc/nginx/templates/default.conf.tpl:ro
       - ./nginx/html:/var/www/html:ro
       - ./nginx/ssl:/etc/nginx/ssl:ro
       - /dev/null:/etc/nginx/conf.d/default.conf
     extra_hosts:
       - "host.docker.internal:host-gateway"
+    env_file:
+      - .env
+      - config.env
+    command: /bin/sh -c "envsubst < /etc/nginx/templates/default.conf.tpl > /etc/nginx/conf.d/default.conf && nginx -g 'daemon off;'"
     networks:
       public_web:
         ipv4_address: 172.20.0.100

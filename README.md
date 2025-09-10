@@ -25,52 +25,44 @@ The project currently includes configurations for the following services:
 
 The domain for all web services is defined during installation. This project automatically creates the chosen domain and corresponding subdomains for each service with a web interface.
 
-Using the example domain `homeserver`, the following subdomains would be generated:
+Using the example domain `homeserver.lan`, the following subdomains would be generated:
 
-- `pihole.homeserver` for Pi-Hole
-- `ha.homeserver` for Home Assistant
-- `komodo.homeserver` for Komodo
-- `webmin.homeserver` for Webmin
+- `pihole.homeserver.lan` for Pi-Hole
+- `ha.homeserver.lan` for Home Assistant
+- `komodo.homeserver.lan` for Komodo
+- `webmin.homeserver.lan` for Webmin
 
-The chosen domain name must match the system's hostname. This ensures that the server's IP address can be correctly resolved by the local DNS server (Pi-hole), allowing all subdomains and services to be accessible on your home network.
-
-The setup also generates a self-signed certificate for the domain and all subdomains. A `ca.crt` file is provided, which you can install on your devices to ensure browsers recognize the HTTPS certificates within your local network.
-
-All services are proxied through nginx, which routes traffic from these subdomains to their respective applications.
+The setup also generates a self-signed certificate for the domain and all subdomains. A `ca.crt` file is provided, which you can install on your devices to ensure browsers recognize the HTTPS certificates within your local network. All services are proxied through nginx.
 
 ## 🚀 Getting Started
 
 ### Prerequisites
 
-To get started with this project, you need to have the following software installed on your server:
-
 * [**Docker**](https://docs.docker.com/get-docker/)
-* [**Docker Compose**](https://docs.docker.com/compose/install/)
+* [**Docker Compose**](https://docs.docker.com/compose/install/) (v2 or superior)
 
 ### Installation and Deployment
 
-1.  Clone this repository to your home server:
+The installation is managed by an interactive script that sets up a clean production environment, separate from the Git repository.
+
+1.  **Clone the Repository:**
 
     ```bash
     git clone https://github.com/danielcdias/home-server.git
     cd home-server
     ```
 
-2.  Create the `.env` file in the root folder with the following variables:
+2.  **Create the Secrets File (`.env`):**
+    Copy the example file `.env.example` to `.env` and fill in all the necessary passwords and secrets.
 
-    | Variable | Description | Example |
-    | :--- | :--- | :--- |
-    | `TZ` | The [timezone code](https://en.wikipedia.org/wiki/List_of_tz_database_time_zones) for your country/area. | `America/Sao_Paulo` |
-    | `POSTGRES_DB` | Database root db (usually postgres). | `postgres` |
-    | `POSTGRES_USER` | Database root username. | `postgres` |
-    | `POSTGRES_PASSWORD` | Database root password. | `a_strong_password` |
-    | `PIHOLE_WEB_PASSWORD` | Password to access Pi-Hole's Web Admin page. | `a_strong_password` |
-    | `HA_POSTGRES_USER` | Home Assistant Postgres username. | `homeassistant` |
-    | `HA_POSTGRES_PASSWORD` | Home Assistant Postgres password. | `a_strong_password` |
-    | `HA_POSTGRES_DB_NAME` | Home Assistant database name to be created in Postgres. | `home_assistant` |
-    | `HA_DB_URL` | URL for Home Assistant access to Postgres database, using the variables defined above. | `postgresql://<username>:<password>@postgres/<db_name>` |
+    ```bash
+    cp .env.example .env
+    nano .env
+    ```
+    **This step is crucial.** The `.env` file will contain all your passwords.
 
-3. Create the `./postgres/config/config.json` file with the databases to be created when PostgreSQL starts. For example, the Home Assistant database:
+3.  **Create PostgreSQL Initial User Configuration:**
+    Create the `./postgres/config/config.json` file with the databases to be created when PostgreSQL starts. For example, the Home Assistant database:
 
     ```json
     [
@@ -81,62 +73,51 @@ To get started with this project, you need to have the following software instal
         }
     ]
     ```
+    ⚠️ **ATTENTION!** The database information here MUST BE THE SAME as defined in the `.env` file.
 
-    ⚠️ **ATTENTION!** The database name, username, and password information for Home Assistant in the config.json file MUST BE THE SAME as defined in the `.env` file.
-
-4.  With both `.env` and `./postgres/config/config.json` files configured, run the `./install.sh` script with sudo, providing the complete path to the `home-server` project folder created in step 1 as an argument:
-
-    ```bash
-    sudo ./install.sh /home/johndoe/home-server
-    ```
-
-    The `./install.sh` script performs the following actions:
-
-    - **Prompts for configuration details**: You will be asked to provide the project's home directory (full path), the domain name (which must match the machine's hostname), and whether to include Webmin support.
-    - **Checks for prerequisites**: The script will verify that required software, such as Docker, is installed.
-    - **Creates a system service**: A `systemctl` service named `homeserver.service` will be created to manage automatic startup.
-    - **Configures Webmin (if selected)**: Webmin will be set up to work behind the nginx reverse proxy.
-    - **Generates SSL certificates**: Self-signed certificates will be created for the main domain and all subdomains.
-
-5. After installation, you can reboot your system to check if the `homeserver.service` will start automatically,  or you can start it manually with:
+4.  **Run the Installation Script:**
+    Execute the `install.sh` script with `sudo`. It will guide you through the configuration process.
 
     ```bash
-    cd\<project_folder>
-    sudo docker compose up -d
+    sudo ./install.sh
     ```
+    The script will ask for:
+    * **Installation Directory:** The location where the runtime files will be stored (default: `/opt/home-server`).
+    * **Domain Name (Hostname)**: The base name for accessing your services (default: the machine's hostname).
+        
+        ⚠️ **Attention**: **It is highly recommended** that you use the default value, which is your machine's actual hostname. The local DNS (Pi-hole), part of this project, is automatically configured so that this name points to your server's correct IP address, ensuring everything works out of the box.
+        
+        If you choose a domain name different from the machine's hostname (e.g., `my-server`), the services will not be accessible over the network until you manually configure a "DNS Record" in the Pi-hole dashboard, pointing your custom domain to the server's IP address. The customization option is intended for advanced users who understand this need.
 
-    Depending on your Docker version, the command might be `docker-compose` instead of `docker compose`.
+    * **Domain Suffix:** Your local network's suffix (default: `lan`).
+    * **Webmin Support:** Whether you want to install and configure Webmin.
 
-## 📡Available Services
+5.  **Start the Services:**
+    After the script finishes, the `homeserver.service` systemd service will be created and enabled. You can start the services immediately with:
 
-This home server deployment provides the following services:
+    ```bash
+    sudo systemctl start homeserver.service
+    ```
+    To check the status, use `sudo systemctl status homeserver.service`. The services will also start automatically with the system.
 
-### Web Interfaces
-All web-accessible services are available through a secure reverse proxy with HTTPS encryption:
+## 📡 Available Services
 
-- **Central Dashboard**: https://homeserver/ - Overview page with links to all services.
-- **Pi-hole**: https://pihole.homeserver - Network-wide ad blocking and DNS management.
-- **Home Assistant**: https://ha.homeserver - Home automation and smart device control panel.
-- **Komodo**: https://komodo.homeserver - Server management and deployment automation interface.
-- **Webmin**: https://webmin.homeserver - System administration web console
+After installation, the services will be available through a secure reverse proxy with HTTPS encryption at the following addresses (replace `homeserver.lan` with your chosen domain):
 
-### Network Services
-- **PostgreSQL Database**: Accessible on port 5432 for database operations and application connectivity.
-- **Pi-hole DNS Service**: Listening on port 53 for network-wide DNS resolution and filtering.
+- **Central Dashboard**: `https://homeserver.lan/`
+- **Pi-hole**: `https://pihole.homeserver.lan/admin/`
+- **Home Assistant**: `https://ha.homeserver.lan/`
+- **Komodo**: `https://komodo.homeserver.lan/`
+- **Webmin**: `https://webmin.homeserver.lan/`
 
 ## ⚙️ Additional Configuration Notes
-
-### Webmin Setup
-
-If selected during installation, Webmin is automatically configured to work behind the nginx reverse proxy. The script modifies Webmin's configuration to enable secure access through the proxy.
 
 ### SSL Certificates
 
 The self-signed certificates generated during installation need to be trusted on your devices:
 
-1. Locate the ca.crt file generated by the install script (`<project_folder>/nginx/ssl/ca.crt`).
-2. Import it into your device's trusted root certificate authorities.
-3. This will prevent browser security warnings when accessing services.
+1. Locate the `ca.crt` file in your installation directory (e.g., `/opt/home-server/nginx/ssl/ca.crt`).
+2. Import it into your device's or browser's trusted root certificate authorities. This will prevent security warnings.
 
 ### Network Considerations
 
@@ -148,9 +129,9 @@ The self-signed certificates generated during installation need to be trusted on
 
 Regularly backup:
 
-- PostgreSQL databases using pg_dump.
-- Docker volumes containing application data.
-- Configuration files from the repository.
+- PostgreSQL databases using `pg_dump`.
+- Docker volumes containing application data (e.g., `mongo-data`, `postgres_data`).
+- The installation directory, which contains your configuration files (`config.env`, `.env`, etc.).
 
 ## 📊 Project Status
 
@@ -158,7 +139,7 @@ The project is currently under development.
 
 ## 🤝 Contributing
 
-Feel free to submit issues and enhancement requests for improving this home server setup.
+Feel free to submit issues and enhancement requests.
 
 ## 📜 License
 
