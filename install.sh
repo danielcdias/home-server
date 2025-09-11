@@ -134,6 +134,8 @@ check_dependencies() {
     if ! command -v docker &> /dev/null; then log_error "Docker não está instalado!"; exit 1; fi
     if ! command -v docker-compose &> /dev/null && ! (command -v docker &> /dev/null && docker compose version &> /dev/null); then log_error "Docker Compose não está instalado!"; exit 1; fi
     if ! command -v openssl &> /dev/null; then log_error "OpenSSL não está instalado!"; exit 1; fi
+    # <-- MUDANÇA AQUI: Adicionada verificação do rsync
+    if ! command -v rsync &> /dev/null; then log_error "rsync não está instalado! Por favor, instale com 'sudo apt-get install rsync' ou 'sudo yum install rsync'."; exit 1; fi
     log_info "Dependências verificadas."
 }
 
@@ -147,8 +149,8 @@ prepare_install_dir() {
     mkdir -p "$INSTALL_DIR" || { log_error "Falha ao criar diretório de instalação!"; exit 1; }
     
     log_info "Copiando arquivos do projeto de $SOURCE_DIR para $INSTALL_DIR..."
-    # Usar rsync para mais controle e para excluir o próprio diretório git
-    rsync -av --progress "$SOURCE_DIR/" "$INSTALL_DIR/" --exclude ".git" --exclude ".gitignore"
+    # <-- MUDANÇA AQUI: Adicionado tratamento de erro para o comando rsync
+    rsync -av --progress "$SOURCE_DIR/" "$INSTALL_DIR/" --exclude ".git" --exclude ".gitignore" || { log_error "Falha ao copiar arquivos com rsync! A instalação foi interrompida."; exit 1; }
     
     # Criar diretórios que podem não existir no fonte mas são necessários no runtime
     mkdir -p "$INSTALL_DIR/runtime_config/etc-pihole"
@@ -287,3 +289,4 @@ main() {
 }
 
 main "$@"
+

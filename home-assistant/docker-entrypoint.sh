@@ -8,7 +8,7 @@ HACS_DIR="${CONFIG_DIR}/custom_components/hacs"
 # Função para instalar o HACS de forma mais robusta
 install_hacs() {
   echo "HACS não encontrado. Iniciando a instalação..."
-  
+
   # Navega para o diretório de componentes personalizados
   mkdir -p "${HACS_DIR}"
   cd "${HACS_DIR}"
@@ -16,16 +16,16 @@ install_hacs() {
   # Baixa o arquivo zip da última versão do HACS
   # Usando uma URL fixa para o zip, que é mais confiável que o pip
   wget -q -O hacs.zip "https://github.com/hacs/integration/archive/main.zip"
-  
+
   # Descompacta o conteúdo do arquivo
   unzip -q hacs.zip
-  
+
   # Move os arquivos para o diretório correto
   mv integration-main/* .
-  
+
   # Limpa os arquivos temporários
   rm -rf integration-main hacs.zip
-  
+
   # Navega de volta para o diretório de configuração
   cd "${CONFIG_DIR}"
 
@@ -49,10 +49,12 @@ if [ ! -f "${CONFIG_DIR}/configuration.yaml" ]; then
     cat <<EOF > "${CONFIG_DIR}/configuration.yaml"
 # Configuração do proxy reverso para Nginx
 http:
+  server_host:
+    - 0.0.0.0
   use_x_forwarded_for: true
-  # Faixa de IP da rede interna do Docker.
   trusted_proxies:
-    - 172.19.0.0/16 
+    - 0.0.0.0/0
+  login_attempts_threshold: 3
 EOF
 fi
 

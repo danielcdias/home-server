@@ -1,3 +1,6 @@
+access_log /dev/stdout;
+error_log /dev/stderr notice;
+
 # Redirecionamento HTTP para HTTPS
 server {
     listen 80;
