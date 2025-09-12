@@ -246,11 +246,22 @@ generate_certificates() {
         log_error "Script generate-certs.sh não encontrado em $INSTALL_DIR";
         exit 1;
     fi
+
+    # --- INÍCIO DA ALTERAÇÃO ---
+    # Detecta o endereço IP principal da máquina host
+    local host_ip
+    host_ip=$(hostname -I | awk '{print $1}')
+    if [[ -z "$host_ip" ]]; then
+        log_warn "Não foi possível detectar o IP do host. O certificado será gerado sem IP."
+    else
+        log_info "IP do host detectado para o certificado: $host_ip"
+    fi
+    # --- FIM DA ALTERAÇÃO ---
     
     log_info "Gerando certificados SSL..."
     chmod +x "$cert_script"
-    # Passar todos os parâmetros para o script de certificados
-    "$cert_script" --path "$INSTALL_DIR" --hostname "$SERVER_HOSTNAME" --domain-suffix "$DOMAIN_SUFFIX" --webmin "$ENABLE_WEBMIN"
+    # Passar todos os parâmetros, incluindo o IP do host detectado
+    "$cert_script" --path "$INSTALL_DIR" --hostname "$SERVER_HOSTNAME" --domain-suffix "$DOMAIN_SUFFIX" --webmin "$ENABLE_WEBMIN" --ip "$host_ip"
 }
 
 # Função principal

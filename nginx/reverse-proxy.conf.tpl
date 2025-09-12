@@ -31,7 +31,7 @@ server {
 # Proxy para o Pi-hole (pihole.${SERVER_HOSTNAME}.${DOMAIN_SUFFIX})
 server {
     listen 443 ssl;
-    server_name pihole.${SERVER_HOSTNAME}.${DOMAIN_SUFFIX};
+    server_name pihole.${SERVER_HOSTNAME};
     
     ssl_certificate /etc/nginx/ssl/${SERVER_HOSTNAME}.crt;
     ssl_certificate_key /etc/nginx/ssl/${SERVER_HOSTNAME}.key;
@@ -52,7 +52,7 @@ server {
 # Proxy para o Home Assistant (ha.${SERVER_HOSTNAME}.${DOMAIN_SUFFIX})
 server {
     listen 443 ssl;
-    server_name ha.${SERVER_HOSTNAME}.${DOMAIN_SUFFIX};
+    server_name ha.${SERVER_HOSTNAME};
     
     ssl_certificate /etc/nginx/ssl/${SERVER_HOSTNAME}.crt;
     ssl_certificate_key /etc/nginx/ssl/${SERVER_HOSTNAME}.key;
@@ -77,7 +77,7 @@ server {
 # Proxy para o Komodo (komodo.${SERVER_HOSTNAME}.${DOMAIN_SUFFIX})
 server {
     listen 443 ssl;
-    server_name komodo.${SERVER_HOSTNAME}.${DOMAIN_SUFFIX};
+    server_name komodo.${SERVER_HOSTNAME};
     
     ssl_certificate /etc/nginx/ssl/${SERVER_HOSTNAME}.crt;
     ssl_certificate_key /etc/nginx/ssl/${SERVER_HOSTNAME}.key;
@@ -102,7 +102,7 @@ server {
 # Proxy para o Webmin (webmin.${SERVER_HOSTNAME}.${DOMAIN_SUFFIX})
 server {
     listen 443 ssl;
-    server_name webmin.${SERVER_HOSTNAME}.${DOMAIN_SUFFIX};
+    server_name webmin.${SERVER_HOSTNAME};
     
     ssl_certificate /etc/nginx/ssl/${SERVER_HOSTNAME}.crt;
     ssl_certificate_key /etc/nginx/ssl/${SERVER_HOSTNAME}.key;

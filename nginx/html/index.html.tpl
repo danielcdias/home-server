@@ -57,10 +57,10 @@
     <div class="container">
         <h1>Serviços Disponíveis</h1>
         <ul>
-            <li><a href="https://pihole.{{SERVER_HOSTNAME}}.{{DOMAIN_SUFFIX}}/admin/" target="_blank">Pi-hole</a></li>
-            <li><a href="https://ha.{{SERVER_HOSTNAME}}.{{DOMAIN_SUFFIX}}" target="_blank">Home Assistant</a></li>
-            <li><a href="https://komodo.{{SERVER_HOSTNAME}}.{{DOMAIN_SUFFIX}}" target="_blank">Komodo</a></li>
-            <li><a href="https://webmin.{{SERVER_HOSTNAME}}.{{DOMAIN_SUFFIX}}" target="_blank">Webmin</a></li>
+            <li><a href="https://pihole.{{SERVER_HOSTNAME}}/admin/" target="_blank">Pi-hole</a></li>
+            <li><a href="https://ha.{{SERVER_HOSTNAME}}" target="_blank">Home Assistant</a></li>
+            <li><a href="https://komodo.{{SERVER_HOSTNAME}}" target="_blank">Komodo</a></li>
+            <li><a href="https://webmin.{{SERVER_HOSTNAME}}" target="_blank">Webmin</a></li>
         </ul>
     </div>
 </body>
