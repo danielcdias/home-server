@@ -1,4 +1,6 @@
-# 🏠🖥️ home-server
+![home-server](./resources/logo/homeserver-logo_mini.png "home-server logo")
+
+# home-server
 
 ## 👁️ Project Overview
 
