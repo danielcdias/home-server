@@ -1,5 +1,15 @@
 #!/bin/bash
 
+# Encerra o script se qualquer comando falhar
+set -e
+
+# --- CAPTURAR USUÁRIO E GRUPO ORIGINAL ANTES DE TUDO ---
+# O usuário que executa o script (mesmo que com sudo, USER ainda reflete o usuário original)
+ORIGINAL_USER="${SUDO_USER:-$(whoami)}"
+# O grupo primário do usuário original
+ORIGINAL_GROUP=$(id -gn "$ORIGINAL_USER")
+# --- FIM DA CAPTURA ---
+
 # Configurações padrão
 DEFAULT_INSTALL_DIR="/opt/home-server"
 DEFAULT_HOSTNAME=$(hostname | cut -d'.' -f1)
@@ -33,7 +43,7 @@ show_usage() {
 # Funções de log (log_info, log_warn, log_error)
 log_info() { echo -e "${GREEN}[INFO]${NC} $1"; }
 log_warn() { echo -e "${YELLOW}[WARN]${NC} $1"; }
-log_error() { echo -e "${RED}[ERROR]${NC} $1"; }
+log_error() { echo -e "${RED}[ERROR]${NC} $1"; exit 1; }
 
 # Função para prompt com valor padrão
 prompt_with_default() {
@@ -41,13 +51,13 @@ prompt_with_default() {
     local default_value="$2"
     local variable_name="$3"
     echo -e "${BLUE}🤖 ${message}${NC}"
-    read -p "$(echo -e "${BLUE}   (pressione ENTER para '${default_value}'): ${NC}")" user_input
+    read -p "$(echo -e "${BLUE}    (pressione ENTER para '${default_value}'): ${NC}")" user_input
     if [[ -z "$user_input" ]]; then
         eval "$variable_name=\"$default_value\""
-        echo -e "${GREEN}   ✅ Usando: ${default_value}${NC}"
+        echo -e "${GREEN}    ✅ Usando: ${default_value}${NC}"
     else
         eval "$variable_name=\"$user_input\""
-        echo -e "${GREEN}   ✅ Usando: ${user_input}${NC}"
+        echo -e "${GREEN}    ✅ Usando: ${user_input}${NC}"
     fi
     echo
 }
@@ -56,7 +66,7 @@ prompt_with_default() {
 confirm_action() {
     local message="$1"
     echo -e "${YELLOW}⚠️  ${message}${NC}"
-    read -p "$(echo -e "${YELLOW}   Tem certeza que deseja continuar? (s/N): ${NC}")" -n 1 -r
+    read -p "$(echo -e "${YELLOW}    Tem certeza que deseja continuar? (S/n): ${NC}")" -n 1 -r
     echo
     if [[ ! $REPLY =~ ^[Ss]$ ]]; then
         echo -e "${GREEN}Operação cancelada.${NC}"
@@ -67,14 +77,14 @@ confirm_action() {
 # Função para perguntar sobre Webmin
 prompt_webmin() {
     echo -e "${BLUE}🤖 Suporte ao Webmin${NC}"
-    read -p "$(echo -e "${BLUE}   Deseja habilitar o suporte ao Webmin (requer instalação se não existir)? (S/n): ${NC}")" -n 1 -r
+    read -p "$(echo -e "${BLUE}    Deseja habilitar o suporte ao Webmin (requer instalação se não existir)? (S/n): ${NC}")" -n 1 -r
     echo
     if [[ $REPLY =~ ^[Nn]$ ]]; then
         ENABLE_WEBMIN=false
-        echo -e "${YELLOW}   ⚠️  Suporte ao Webmin desabilitado${NC}"
+        echo -e "${YELLOW}    ⚠️  Suporte ao Webmin desabilitado${NC}"
     else
         ENABLE_WEBMIN=true
-        echo -e "${GREEN}   ✅ Suporte ao Webmin habilitado${NC}"
+        echo -e "${GREEN}    ✅ Suporte ao Webmin habilitado${NC}"
     fi
     echo
 }
@@ -109,10 +119,10 @@ parse_arguments() {
         prompt_webmin
         
         echo -e "${GREEN}📋 Resumo da configuração:${NC}"
-        echo -e "   📦 Diretório de instalação: ${GREEN}$INSTALL_DIR${NC}"
-        echo -e "   🌐 Hostname: ${GREEN}$SERVER_HOSTNAME${NC}"
-        echo -e "   🔗 Domínio Completo: ${GREEN}$SERVER_HOSTNAME.$DOMAIN_SUFFIX${NC}"
-        echo -e "   🖥️  Webmin: ${GREEN}$([[ "$ENABLE_WEBMIN" == true ]] && echo "Habilitado" || echo "Desabilitado")${NC}\n"
+        echo -e "    📦 Diretório de instalação: ${GREEN}$INSTALL_DIR${NC}"
+        echo -e "    🌐 Hostname: ${GREEN}$SERVER_HOSTNAME${NC}"
+        echo -e "    🔗 Domínio Completo: ${GREEN}$SERVER_HOSTNAME.$DOMAIN_SUFFIX${NC}"
+        echo -e "    🖥️  Webmin: ${GREEN}$([[ "$ENABLE_WEBMIN" == true ]] && echo "Habilitado" || echo "Desabilitado")${NC}\n"
         
         confirm_action "O projeto será instalado e configurado no diretório de destino."
     fi
@@ -124,18 +134,16 @@ parse_arguments() {
 check_root() {
     if [[ $EUID -ne 0 ]]; then
         log_error "Este script deve ser executado como root!"
-        exit 1
     fi
 }
 
 # Função para verificar dependências
 check_dependencies() {
     log_info "Verificando dependências..."
-    if ! command -v docker &> /dev/null; then log_error "Docker não está instalado!"; exit 1; fi
-    if ! command -v docker-compose &> /dev/null && ! (command -v docker &> /dev/null && docker compose version &> /dev/null); then log_error "Docker Compose não está instalado!"; exit 1; fi
-    if ! command -v openssl &> /dev/null; then log_error "OpenSSL não está instalado!"; exit 1; fi
-    # <-- MUDANÇA AQUI: Adicionada verificação do rsync
-    if ! command -v rsync &> /dev/null; then log_error "rsync não está instalado! Por favor, instale com 'sudo apt-get install rsync' ou 'sudo yum install rsync'."; exit 1; fi
+    if ! command -v docker &> /dev/null; then log_error "Docker não está instalado!"; fi
+    if ! command -v docker-compose &> /dev/null && ! (command -v docker &> /dev/null && docker compose version &> /dev/null); then log_error "Docker Compose não está instalado!"; fi
+    if ! command -v openssl &> /dev/null; then log_error "OpenSSL não está instalado!"; fi
+    if ! command -v rsync &> /dev/null; then log_error "rsync não está instalado! Por favor, instale com 'sudo apt-get install rsync' ou 'sudo yum install rsync'."; fi
     log_info "Dependências verificadas."
 }
 
@@ -146,11 +154,10 @@ prepare_install_dir() {
         log_warn "O diretório de instalação já existe."
         confirm_action "Isso pode sobrescrever arquivos existentes. Deseja continuar?"
     fi
-    mkdir -p "$INSTALL_DIR" || { log_error "Falha ao criar diretório de instalação!"; exit 1; }
+    mkdir -p "$INSTALL_DIR" || log_error "Falha ao criar diretório de instalação: $INSTALL_DIR"
     
     log_info "Copiando arquivos do projeto de $SOURCE_DIR para $INSTALL_DIR..."
-    # <-- MUDANÇA AQUI: Adicionado tratamento de erro para o comando rsync
-    rsync -av --progress "$SOURCE_DIR/" "$INSTALL_DIR/" --exclude ".git" --exclude ".gitignore" || { log_error "Falha ao copiar arquivos com rsync! A instalação foi interrompida."; exit 1; }
+    rsync -av --progress "$SOURCE_DIR/" "$INSTALL_DIR/" --exclude ".git" --exclude ".gitignore" || log_error "Falha ao copiar arquivos com rsync! A instalação foi interrompida."
     
     # Criar diretórios que podem não existir no fonte mas são necessários no runtime
     mkdir -p "$INSTALL_DIR/runtime_config/etc-pihole"
@@ -170,7 +177,6 @@ generate_config_env() {
 # Configurações de Domínio e Rede
 SERVER_HOSTNAME=$SERVER_HOSTNAME
 DOMAIN_SUFFIX=$DOMAIN_SUFFIX
-NGINX_IPV4=172.20.0.100
 
 # Configurações de Componentes
 ENABLE_WEBMIN=$ENABLE_WEBMIN
@@ -244,10 +250,8 @@ generate_certificates() {
     local cert_script="$INSTALL_DIR/generate-certs.sh"
     if [[ ! -f "$cert_script" ]]; then
         log_error "Script generate-certs.sh não encontrado em $INSTALL_DIR";
-        exit 1;
     fi
 
-    # --- INÍCIO DA ALTERAÇÃO ---
     # Detecta o endereço IP principal da máquina host
     local host_ip
     host_ip=$(hostname -I | awk '{print $1}')
@@ -256,12 +260,20 @@ generate_certificates() {
     else
         log_info "IP do host detectado para o certificado: $host_ip"
     fi
-    # --- FIM DA ALTERAÇÃO ---
     
     log_info "Gerando certificados SSL..."
     chmod +x "$cert_script"
     # Passar todos os parâmetros, incluindo o IP do host detectado
     "$cert_script" --path "$INSTALL_DIR" --hostname "$SERVER_HOSTNAME" --domain-suffix "$DOMAIN_SUFFIX" --webmin "$ENABLE_WEBMIN" --ip "$host_ip"
+}
+
+# Função: Criar uninstall.info
+create_uninstall_info() {
+    log_info "Criando arquivo de informações para desinstalação em $INSTALL_DIR/uninstall.info..."
+    echo "INSTALL_DIR=$INSTALL_DIR" > "$INSTALL_DIR/uninstall.info"
+    echo "SYSTEMD_SERVICE_NAME=$SERVICE_NAME.service" >> "$INSTALL_DIR/uninstall.info"
+    chmod 600 "$INSTALL_DIR/uninstall.info" # Permissões restritas
+    log_info "✅ Arquivo uninstall.info criado."
 }
 
 # Função principal
@@ -286,18 +298,26 @@ main() {
     create_service_file
     setup_service
     generate_certificates
+    create_uninstall_info
     
+    # --- NOVA AÇÃO: Restaurar ownership ---
+    log_info "Restaurando ownership da pasta de instalação para ${BLUE}${ORIGINAL_USER}:${ORIGINAL_GROUP}${NC}..."
+    chown -R "$ORIGINAL_USER:$ORIGINAL_GROUP" "$INSTALL_DIR" || log_warn "Falha ao restaurar ownership. Verifique permissões manualmente em '$INSTALL_DIR'."
+    log_info "✅ Ownership da pasta de instalação restaurado."
+    # --- FIM DA NOVA AÇÃO ---
+
     echo ""
-    log_info "=== INSTALAÇÃO CONCLUÍDA ==="
+    log_info "=== ✅ INSTALAÇÃO CONCLUÍDA ✅ ==="
     log_info "Os arquivos de execução estão em: $INSTALL_DIR"
     log_info "A configuração do ambiente está em: $INSTALL_DIR/config.env"
     log_info "Lembre-se de configurar os segredos em: $INSTALL_DIR/.env"
     log_info "Serviço systemd '$SERVICE_NAME' foi criado e habilitado."
-    echo ""
+    log_info ""
     log_warn "Execute 'systemctl start $SERVICE_NAME' para iniciar os serviços."
-    log_info "Acesse o dashboard em: https://$SERVER_HOSTNAME.$DOMAIN_SUFFIX"
+    log_info "Acesse o dashboard em: https://$SERVER_HOSTNAME"
+    log_info ""
+    log_info "${GREEN}Para desinstalar, navegue até '${INSTALL_DIR}' e execute './uninstall.sh'.${NC}"
     log_info "Instalação finalizada com sucesso! 🚀"
 }
 
 main "$@"
-

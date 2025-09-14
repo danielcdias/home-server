@@ -108,7 +108,7 @@ services:
       FTLCONF_webserver_api_password: ${PIHOLE_WEB_PASSWORD:-changeme}
       FTLCONF_dns_listeningMode: 'all'
       FTLCONF_misc_etc_dnsmasq_d: 'true'
-      FTLCONF_misc_dnsmasq_lines: "address=/${SERVER_HOSTNAME}/${NGINX_IPV4}"
+      FTLCONF_misc_dnsmasq_lines: "address=/${SERVER_HOSTNAME:-homeserver}/172.20.0.100"
     volumes:
       - ./runtime_config/etc-pihole:/etc/pihole
     networks:
