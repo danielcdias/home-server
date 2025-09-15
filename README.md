@@ -155,7 +155,7 @@ The uninstallation process will perform the following actions:
 - Permanently delete all Docker volumes created by the project.
 - Remove the entire installation directory.
 
-  ⚠️ Warning: This action is destructive and irreversible. It will permanently delete all data, including the PostgreSQL database, information in other Docker volumes, and all configuration files. Proceed with extreme caution.
+⚠️ **Warning**: **This action is destructive and irreversible**. It will permanently delete all data, including the PostgreSQL database, information in other Docker volumes, and all configuration files. Proceed with extreme caution.
 
 ## 📊 Project Status
 
