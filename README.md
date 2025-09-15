@@ -1,5 +1,5 @@
 <p align="center">
-<img src="./resources/logo/homeserver_logo(cinza).png" style="width: 150px; border: #303030 solid 4px;">
+<img src="./resources/logo/homeserver_logo(cinza).png" style="width: 150px; border: #404040 solid 5px;">
 </p>
 
 # home-server
