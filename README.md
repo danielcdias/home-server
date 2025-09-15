@@ -1,4 +1,6 @@
-![home-server](./resources/logo/homeserver-logo_mini.png "home-server logo")
+<p align="center">
+<img src="./resources/logo/homeserver_logo(cinza).png" style="width: 150px; border: #303030 solid 4px;">
+</p>
 
 # home-server
 
@@ -135,6 +137,26 @@ Regularly backup:
 - Docker volumes containing application data (e.g., `mongo-data`, `postgres_data`).
 - The installation directory, which contains your configuration files (`config.env`, `.env`, etc.).
 
+### Uninstallation
+
+To completely remove the project, run the `uninstall.sh` script.
+
+You must execute the script from the **installation directory** (for example, `/opt/home-server`), not from the source code folder where you cloned the repository. The script also requires superuser privileges.
+
+For example, if your installation directory is `/opt/home-server`, run the following commands:
+
+```bash
+cd /opt/home-server
+sudo ./uninstall.sh
+```
+The uninstallation process will perform the following actions:
+
+- Stop and disable the homeserver.service systemd unit.
+- Permanently delete all Docker volumes created by the project.
+- Remove the entire installation directory.
+
+  ⚠️ Warning: This action is destructive and irreversible. It will permanently delete all data, including the PostgreSQL database, information in other Docker volumes, and all configuration files. Proceed with extreme caution.
+
 ## 📊 Project Status
 
 The project is currently under development.
@@ -143,6 +165,12 @@ The project is currently under development.
 
 Feel free to submit issues and enhancement requests.
 
-## 📜 License
+## 📜 Disclaimer
 
-This project is open source and available under the MIT License.
+As per the GNU General Public License v3.0 included in this project, this software is distributed in the hope that it will be useful, but **WITHOUT ANY WARRANTY**; without even the implied warranty of **MERCHANTABILITY** or **FITNESS FOR A PARTICULAR PURPOSE**.
+
+The entire risk as to the quality and performance of the program is with you. This project makes no provision for data backup, security, or disaster recovery. By using this software, you assume full responsibility for any and all data loss or system failure.
+
+In no event shall the authors or copyright holders be liable for any claim, damages, or other liability. You are using this software solely **at your own risk**.
+
+For the full terms and conditions, please see the `LICENSE` file.
