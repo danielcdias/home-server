@@ -28,11 +28,11 @@ server {
     index index.html;
 
     # Bloco para servir o favicon.ico de forma eficiente
-    location = /favicon.ico {
-        log_not_found off; # Não registrar erros se o arquivo não for encontrado
-        access_log off;    # Não registrar acessos para este arquivo
-        expires 1y;        # Instruir o navegador a manter o ícone em cache por 1 ano
-    }
+    # location = /img/favicon.ico {
+    #     log_not_found off; # Não registrar erros se o arquivo não for encontrado
+    #     access_log off;    # Não registrar acessos para este arquivo
+    #     expires 7d;        # Instruir o navegador a manter o ícone em cache por 1 ano
+    # }
 }
 
 # Proxy para o Pi-hole (pihole.${SERVER_HOSTNAME}.${DOMAIN_SUFFIX})
