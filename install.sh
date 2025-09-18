@@ -311,6 +311,7 @@ main() {
     log_info "The execution files are in: $INSTALL_DIR"
     log_info "The environment configuration is in: $INSTALL_DIR/config.env"
     log_info "${YELLOW}Remember to configure the secrets in: $INSTALL_DIR/.env"
+    log_info "${YELLOW}Also remember to create file config.json in folder $INSTALL_DIR/postgres/config"
     log_info "The systemd service '$SERVICE_NAME' has been created and enabled."
     log_info ""
     log_warn "Run 'sudo systemctl start $SERVICE_NAME' to start the services."

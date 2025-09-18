@@ -129,7 +129,7 @@ main() {
         local prefixed_volumes=()
         for vol in "${detected_volumes[@]}"; do
             prefixed_volumes+=("${project_name}_${vol}")
-        end
+        done
 
         if [[ ${#prefixed_volumes[@]} -gt 0 ]]; then
             log_info "Volumes detected in the Docker Compose file:"
@@ -254,3 +254,4 @@ main() {
 }
 
 main "$@"
+

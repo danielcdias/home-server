@@ -9,6 +9,7 @@ RUN apt-get update && \
 
 RUN mkdir -p /docker-entrypoint-initdb.d/config
 
-COPY . /docker-entrypoint-initdb.d
+COPY init.sh /docker-entrypoint-initdb.d
+COPY config/config.json /docker-entrypoint-initdb.d/config
 
 RUN chmod +x /docker-entrypoint-initdb.d/init.sh
