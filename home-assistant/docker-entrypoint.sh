@@ -1,53 +1,53 @@
 #!/bin/bash
 
-# Diretório de configuração do Home Assistant
+# Home Assistant configuration directory
 CONFIG_DIR="/config"
-# Diretório de destino do HACS
+# HACS destination directory
 HACS_DIR="${CONFIG_DIR}/custom_components/hacs"
 
-# Função para instalar o HACS de forma mais robusta
+# Function to install HACS more robustly
 install_hacs() {
-  echo "HACS não encontrado. Iniciando a instalação..."
+  echo "HACS not found. Starting installation..."
 
-  # Navega para o diretório de componentes personalizados
+  # Navigate to the custom components directory
   mkdir -p "${HACS_DIR}"
   cd "${HACS_DIR}"
 
-  # Baixa o arquivo zip da última versão do HACS
-  # Usando uma URL fixa para o zip, que é mais confiável que o pip
+  # Download the zip file of the latest HACS version
+  # Using a fixed URL for the zip, which is more reliable than pip
   wget -q -O hacs.zip "https://github.com/hacs/integration/archive/main.zip"
 
-  # Descompacta o conteúdo do arquivo
+  # Unzip the contents of the file
   unzip -q hacs.zip
 
-  # Move os arquivos para o diretório correto
+  # Move the files to the correct directory
   mv integration-main/* .
 
-  # Limpa os arquivos temporários
+  # Clean up temporary files
   rm -rf integration-main hacs.zip
 
-  # Navega de volta para o diretório de configuração
+  # Navigate back to the configuration directory
   cd "${CONFIG_DIR}"
 
   if [ -d "${HACS_DIR}" ]; then
-    echo "Instalação do HACS concluída com sucesso."
+    echo "HACS installation completed successfully."
   else
-    echo "Erro na instalação do HACS."
+    echo "HACS installation failed."
   fi
 }
 
-# Verifica se o diretório do HACS já existe
+# Check if the HACS directory already exists
 if [ ! -d "$HACS_DIR" ]; then
     install_hacs
 else
-    echo "HACS já está instalado. Nenhuma ação necessária."
+    echo "HACS is already installed. No action needed."
 fi
 
-# Cria o arquivo de configuração inicial, se ele não existir
+# Create the initial configuration file, if it doesn't exist
 if [ ! -f "${CONFIG_DIR}/configuration.yaml" ]; then
-    echo "Criando o arquivo de configuração inicial..."
+    echo "Creating the initial configuration file..."
     cat <<EOF > "${CONFIG_DIR}/configuration.yaml"
-# Configuração do proxy reverso para Nginx
+# Reverse proxy configuration for Nginx
 http:
   server_host:
     - 0.0.0.0
@@ -58,6 +58,6 @@ http:
 EOF
 fi
 
-# Inicia o serviço principal do Home Assistant
-echo "Iniciando o Home Assistant..."
+# Start the main Home Assistant service
+echo "Starting Home Assistant..."
 exec python3 -m homeassistant --config "${CONFIG_DIR}" "$@"

@@ -1,1 +1,1 @@
-- Reinstalar server.
+- Alterar o install.sh para não iniciar se o .env não estiver criado.

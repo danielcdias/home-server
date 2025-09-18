@@ -1,9 +1,9 @@
 #!/bin/bash
 
-# Configuração padrão
+# Default configuration
 DEFAULT_PROJECT_DIR="/home/daniel/home-server"
 
-# Parsear argumentos
+# Parse arguments
 PROJECT_DIR="$DEFAULT_PROJECT_DIR"
 while [[ $# -gt 0 ]]; do
     case $1 in
@@ -17,22 +17,22 @@ while [[ $# -gt 0 ]]; do
     esac
 done
 
-# Verificar se o diretório existe
+# Check if the directory exists
 if [[ ! -d "$PROJECT_DIR" ]]; then
-    echo "Erro: Diretório do projeto não encontrado: $PROJECT_DIR"
+    echo "Error: Project directory not found: $PROJECT_DIR"
     exit 1
 fi
 
-# Detectar comando docker compose
+# Detect docker compose command
 if command -v docker > /dev/null && docker compose version > /dev/null 2>&1; then
     DOCKER_COMPOSE_CMD="docker compose"
 elif command -v docker-compose > /dev/null; then
     DOCKER_COMPOSE_CMD="docker-compose"
 else
-    echo "Docker Compose não encontrado!"
+    echo "Docker Compose not found!"
     exit 1
 fi
 
 cd "$PROJECT_DIR" || exit 1
-echo "Parando serviços em: $PROJECT_DIR"
+echo "Stopping services in: $PROJECT_DIR"
 $DOCKER_COMPOSE_CMD down

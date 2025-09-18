@@ -2,15 +2,15 @@
 
 set -e
 
-echo "Banco de dados pronto. Criando bancos de dados e usuários..."
+echo "Database ready. Creating databases and users..."
 
-# Exporta a variável de ambiente PGPASSWORD
+# Export the PGPASSWORD environment variable
 export PGPASSWORD=${POSTGRES_PASSWORD}
 
-# Lê o arquivo JSON usando 'jq'
+# Read the JSON file using 'jq'
 config_json=$(cat /docker-entrypoint-initdb.d/config/config.json)
 
-# Itera sobre cada objeto JSON (cada conjunto de credenciais)
+# Iterate over each JSON object (each set of credentials)
 for row in $(echo "${config_json}" | jq -r '.[] | @base64'); do
     _jq() {
         echo ${row} | base64 --decode | jq -r ${1}
@@ -20,26 +20,26 @@ for row in $(echo "${config_json}" | jq -r '.[] | @base64'); do
     DB_USER=$(_jq '.user')
     DB_PASSWORD=$(_jq '.password')
 
-    # Verifica se o banco de dados já existe
+    # Check if the database already exists
     if ! psql -v ON_ERROR_STOP=1 -U "$POSTGRES_USER" -d "$POSTGRES_DB" -tAc "SELECT 1 FROM pg_database WHERE datname='$DB_NAME'" | grep -q 1; then
-        echo "Criando banco de dados: $DB_NAME"
+        echo "Creating database: $DB_NAME"
         psql -v ON_ERROR_STOP=1 -U "$POSTGRES_USER" -d "$POSTGRES_DB" -c "CREATE DATABASE \"$DB_NAME\";"
         
-        echo "Criando usuário: $DB_USER"
+        echo "Creating user: $DB_USER"
         psql -v ON_ERROR_STOP=1 -U "$POSTGRES_USER" -d "$POSTGRES_DB" -c "CREATE USER \"$DB_USER\" WITH PASSWORD '$DB_PASSWORD';"
 
-        echo "Concedendo privilégios em $DB_NAME para $DB_USER"
+        echo "Granting privileges on $DB_NAME for $DB_USER"
         psql -v ON_ERROR_STOP=1 -U "$POSTGRES_USER" -d "$DB_NAME" -c "GRANT ALL PRIVILEGES ON DATABASE \"$DB_NAME\" TO \"$DB_USER\";"
 
-        # Adicione esta linha para alterar a propriedade
-        echo "Alterando a propriedade do banco de dados '$DB_NAME' para '$DB_USER'"
+        # Add this line to change ownership
+        echo "Changing ownership of database '$DB_NAME' to '$DB_USER'"
         psql -v ON_ERROR_STOP=1 -U "$POSTGRES_USER" -d "$DB_NAME" -c "ALTER DATABASE \"$DB_NAME\" OWNER TO \"$DB_USER\";"
     else
-        echo "Banco de dados '$DB_NAME' já existe. Ignorando a criação."
+        echo "Database '$DB_NAME' already exists. Skipping creation."
     fi
 done
 
-echo "Configuração inicial do banco de dados concluída."
+echo "Initial database configuration completed."
 
-# Limpa a variável PGPASSWORD para não expor a senha
+# Clear the PGPASSWORD variable to avoid exposing the password
 unset PGPASSWORD
