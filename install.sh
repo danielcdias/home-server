@@ -20,6 +20,7 @@ DEFAULT_DOMAIN_SUFFIX="lan"
 SERVICE_NAME="homeserver"
 # The script's directory (where the git clone is)
 SOURCE_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+WEBMIN_CONFIG_DIR="/etc/webmin"
 
 # Colors for output
 RED='\033[0;31m'
@@ -212,6 +213,128 @@ process_templates() {
     fi
 }
 
+# Função para configurar Webmin
+configure_webmin() {
+    log_info "Configurando Webmin para aceitar conexões do proxy..."
+    
+    # Verificar se Webmin está instalado
+    if [[ ! -d "$WEBMIN_CONFIG_DIR" ]]; then
+        log_warn "Webmin não está instalado. Pulando configuração do Webmin."
+        return 0
+    fi
+    
+    # Backup dos arquivos originais
+    backup_timestamp=$(date +%Y%m%d_%H%M%S)
+    if [[ -f "$WEBMIN_CONFIG_DIR/config" ]]; then
+        cp "$WEBMIN_CONFIG_DIR/config" "$WEBMIN_CONFIG_DIR/config.backup_$backup_timestamp"
+    fi
+    if [[ -f "$WEBMIN_CONFIG_DIR/miniserv.conf" ]]; then
+        cp "$WEBMIN_CONFIG_DIR/miniserv.conf" "$WEBMIN_CONFIG_DIR/miniserv.conf.backup_$backup_timestamp"
+    fi
+    
+    # Configurar /etc/webmin/config - MODIFICAÇÃO APENAS DAS CONFIGURAÇÕES NECESSÁRIAS
+    if [[ -f "$WEBMIN_CONFIG_DIR/config" ]]; then
+        # Atualizar ou adicionar configurações específicas
+        if ! grep -q "^allow=" "$WEBMIN_CONFIG_DIR/config"; then
+            echo "allow=$WEBMIN_ALLOW_NETWORKS" >> "$WEBMIN_CONFIG_DIR/config"
+        else
+            sed -i "s/^allow=.*/allow=$WEBMIN_ALLOW_NETWORKS/" "$WEBMIN_CONFIG_DIR/config"
+        fi
+        
+        if ! grep -q "^referers=" "$WEBMIN_CONFIG_DIR/config"; then
+            echo "referers=webmin.homeserver" >> "$WEBMIN_CONFIG_DIR/config"
+        else
+            sed -i "s/^referers=.*/referers=webmin.homeserver/" "$WEBMIN_CONFIG_DIR/config"
+        fi
+        
+        if ! grep -q "^noreferers=" "$WEBMIN_CONFIG_DIR/config"; then
+            echo "noreferers=*" >> "$WEBMIN_CONFIG_DIR/config"
+        else
+            sed -i "s/^noreferers=.*/noreferers=*/" "$WEBMIN_CONFIG_DIR/config"
+        fi
+        
+        if ! grep -q "^ssl_redirect=" "$WEBMIN_CONFIG_DIR/config"; then
+            echo "ssl_redirect=0" >> "$WEBMIN_CONFIG_DIR/config"
+        else
+            sed -i "s/^ssl_redirect=.*/ssl_redirect=0/" "$WEBMIN_CONFIG_DIR/config"
+        fi
+        
+        if ! grep -q "^no_ssl_redirect=" "$WEBMIN_CONFIG_DIR/config"; then
+            echo "no_ssl_redirect=1" >> "$WEBMIN_CONFIG_DIR/config"
+        else
+            sed -i "s/^no_ssl_redirect=.*/no_ssl_redirect=1/" "$WEBMIN_CONFIG_DIR/config"
+        fi
+        
+        # Remover configurações conflitantes se existirem
+        sed -i '/^webprefix=/d' "$WEBMIN_CONFIG_DIR/config"
+        sed -i '/^relative_links=/d' "$WEBMIN_CONFIG_DIR/config"
+        
+    else
+        log_error "Arquivo config não encontrado!"
+        return 1
+    fi
+    
+    # Configurar /etc/webmin/miniserv.conf (já está correto)
+    if [[ -f "$WEBMIN_CONFIG_DIR/miniserv.conf" ]]; then
+        # Remover configurações SSL problemáticas
+        sed -i '/^ssl=/d' "$WEBMIN_CONFIG_DIR/miniserv.conf"
+        sed -i '/^ssl_keyfile=/d' "$WEBMIN_CONFIG_DIR/miniserv.conf"
+        sed -i '/^ssl_certfile=/d' "$WEBMIN_CONFIG_DIR/miniserv.conf"
+        sed -i '/^ssl_enforce=/d' "$WEBMIN_CONFIG_DIR/miniserv.conf"
+        sed -i '/^ssl_hsts=/d' "$WEBMIN_CONFIG_DIR/miniserv.conf"
+        sed -i '/^no_trust_ssl=/d' "$WEBMIN_CONFIG_DIR/miniserv.conf"
+        
+        # Adicionar/atualizar configurações necessárias
+        if ! grep -q "^allow=" "$WEBMIN_CONFIG_DIR/miniserv.conf"; then
+            echo "allow=$WEBMIN_ALLOW_NETWORKS" >> "$WEBMIN_CONFIG_DIR/miniserv.conf"
+        else
+            sed -i "s/^allow=.*/allow=$WEBMIN_ALLOW_NETWORKS/" "$WEBMIN_CONFIG_DIR/miniserv.conf"
+        fi
+        
+        if ! grep -q "^referers=" "$WEBMIN_CONFIG_DIR/miniserv.conf"; then
+            echo "referers=webmin.homeserver" >> "$WEBMIN_CONFIG_DIR/miniserv.conf"
+        else
+            sed -i "s/^referers=.*/referers=webmin.homeserver/" "$WEBMIN_CONFIG_DIR/miniserv.conf"
+        fi
+        
+        if ! grep -q "^trust_real_ip=" "$WEBMIN_CONFIG_DIR/miniserv.conf"; then
+            echo "trust_real_ip=1" >> "$WEBMIN_CONFIG_DIR/miniserv.conf"
+        else
+            sed -i "s/^trust_real_ip=.*/trust_real_ip=1/" "$WEBMIN_CONFIG_DIR/miniserv.conf"
+        fi
+        
+        if ! grep -q "^trusted_proxies=" "$WEBMIN_CONFIG_DIR/miniserv.conf"; then
+            echo "trusted_proxies=172.20.0.100" >> "$WEBMIN_CONFIG_DIR/miniserv.conf"
+        else
+            sed -i "s/^trusted_proxies=.*/trusted_proxies=172.20.0.100/" "$WEBMIN_CONFIG_DIR/miniserv.conf"
+        fi
+        
+        # Garantir bind correto
+        sed -i 's/^bind=.*/bind=0.0.0.0/' "$WEBMIN_CONFIG_DIR/miniserv.conf"
+        
+    else
+        log_error "Arquivo miniserv.conf não encontrado!"
+        return 1
+    fi
+    
+    log_info "Configuração do Webmin atualizada com sucesso"
+    log_info "Redes permitidas: $WEBMIN_ALLOW_NETWORKS"
+    
+    # Reiniciar Webmin se estiver rodando
+    if systemctl is-active --quiet webmin; then
+        log_info "Reiniciando Webmin para aplicar configurações..."
+        systemctl restart webmin
+        if [[ $? -eq 0 ]]; then
+            log_info "Webmin reiniciado com sucesso"
+        else
+            log_warn "Falha ao reiniciar Webmin. Reinicie manualmente: systemctl restart webmin"
+        fi
+    fi
+    
+    return 0
+}
+
+
 # Function to create the service file
 create_service_file() {
     log_info "Creating service file at: $SERVICE_FILE"
@@ -293,7 +416,9 @@ main() {
     fi
     
     # Optional: Install and configure Webmin here if necessary
-    # if [[ "$ENABLE_WEBMIN" == true ]]; then ... fi
+    if [[ "$ENABLE_WEBMIN" == true ]]; then
+        configure_webmin
+    fi
 
     create_service_file
     setup_service
