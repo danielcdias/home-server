@@ -1,94 +1,100 @@
 #!/bin/bash
 
 # ==============================================================================
-# Script para fazer backup de todos os bancos de dados de um container
-# PostgreSQL, incluindo o banco de dados 'postgres'.
+# Script to back up all databases from a PostgreSQL Docker container,
+# including the 'postgres' database.
 #
-# Este script carrega as configurações de um arquivo .env localizado no
-# mesmo diretório.
+# This script loads its configuration from a .env file located in the
+# same directory.
 # ==============================================================================
 
-# Define o caminho para o arquivo .env (procura no mesmo diretório do script)
+if [[ $EUID -ne 0 ]]; then
+    echo "[ERROR] This script must be run as root!"
+    exit 1
+fi
+
+# Set the path to the .env file (looks in the same directory as the script)
 ENV_FILE="$(dirname "$0")/.env"
 
 if [ -f "${ENV_FILE}" ]; then
-    echo "Carregando variáveis de ambiente do arquivo ${ENV_FILE}..."
-    # Exporta as variáveis do .env para o ambiente de execução do script
-    # Ignora linhas comentadas e vazias.
+    echo "Loading environment variables from ${ENV_FILE}..."
+    # Export variables from .env to the script's execution environment
+    # Ignores commented and empty lines.
     export $(grep -v '^#' "${ENV_FILE}" | grep -v '^$' | xargs)
 else
-    echo "AVISO: Arquivo .env não encontrado em ${ENV_FILE}. Usando variáveis de ambiente já existentes ou valores padrão."
+    echo "WARNING: .env file not found at ${ENV_FILE}. Using existing environment variables or default values."
 fi
 
-# Nome ou ID do container Docker onde o PostgreSQL está rodando.
+# Name or ID of the Docker container where PostgreSQL is running.
 readonly POSTGRES_CONTAINER_NAME="${POSTGRES_CONTAINER_NAME:-postgres}"
 
-# Usuário do PostgreSQL com permissões para acessar todos os bancos de dados.
-# O usuário 'postgres' geralmente é a escolha padrão e mais segura.
+# PostgreSQL user with permissions to access all databases.
+# The 'postgres' user is generally the default and most secure choice.
 readonly POSTGRES_USER="${POSTGRES_USER:-postgres}"
 
-# Diretório no HOST (fora do container) onde os arquivos de backup serão salvos.
-# Este diretório será criado se não existir.
+# Directory on the HOST (outside the container) where backup files will be saved.
+# This directory will be created if it does not exist.
 readonly BACKUP_DIR="/var/backups/pg_container"
 
-echo "--- Iniciando processo de backup do PostgreSQL ---"
-echo "Data e Hora: $(date +'%Y-%m-%d %H:%M:%S')"
-echo "Container: ${CONTAINER_NAME}"
-echo "Usuário PG: ${POSTGRES_USER}"
+echo "--- Starting PostgreSQL backup process ---"
+echo "Date and Time: $(date +'%Y-%m-%d %H:%M:%S')"
+echo "Container: ${POSTGRES_CONTAINER_NAME}"
+echo "PostgreSQL User: ${POSTGRES_USER}"
 
-# 1. Verificar se o Docker está em execução
+# 1. Check if Docker is running
 if ! command -v docker &> /dev/null || ! docker info &> /dev/null; then
-    echo "[ERRO] O serviço do Docker não está em execução ou não foi encontrado."
+    echo "[ERROR] Docker is not running or could not be found."
     exit 1
 fi
 
-# 2. Garantir que o diretório de backup exista no host
-echo "Verificando o diretório de backup: ${BACKUP_DIR}"
+# 2. Ensure the backup directory exists on the host
+echo "Checking backup directory: ${BACKUP_DIR}"
 if ! mkdir -p "${BACKUP_DIR}"; then
-    echo "[ERRO] Falha ao criar o diretório de backup. Verifique as permissões."
+    echo "[ERROR] Failed to create backup directory. Check permissions."
     exit 1
 fi
-echo "Diretório de backup garantido."
+echo "Backup directory ensured."
 
-# 3. Obter a lista de todos os bancos de dados do container
-# Este comando SQL exclui os bancos de dados de template, que não precisam de backup.
-echo "Obtendo a lista de bancos de dados do container '${CONTAINER_NAME}'..."
-DB_LIST=$(docker exec "${CONTAINER_NAME}" psql -U "${POSTGRES_USER}" -t -A -c "SELECT datname FROM pg_database WHERE datistemplate = false;")
+# 3. Get the list of all databases from the container
+# This SQL command excludes template databases, which do not need to be backed up.
+echo "Fetching database list from container '${POSTGRES_CONTAINER_NAME}'..."
+DB_LIST=$(docker exec "${POSTGRES_CONTAINER_NAME}" psql -U "${POSTGRES_USER}" -t -A -c "SELECT datname FROM pg_database WHERE datistemplate = false;")
 
-# Verificar se a lista de bancos foi obtida com sucesso
+# Check if the database list was successfully retrieved
 if [ -z "${DB_LIST}" ]; then
-  echo "[ERRO] Não foi possível obter a lista de bancos de dados. Verifique o nome do container, o usuário e se o container está em execução."
+  echo "[ERROR] Could not retrieve database list. Check the container name, user, and if the container is running."
   exit 1
 fi
 
-echo "Bancos de dados a serem backupeados:"
+echo "Databases to be backed up:"
 echo "${DB_LIST}"
 echo "----------------------------------------"
 
-# 4. Iterar sobre cada banco de dados e executar o backup
+# 4. Loop through each database and perform the backup
 for DB_NAME in $DB_LIST; do
   TIMESTAMP=$(date +%Y%m%d_%H%M%S)
-  # Remove caracteres inválidos que possam existir no nome do banco de dados para o nome do arquivo.
+  # Remove any invalid characters from the database name for the filename.
   CLEAN_DB_NAME=$(echo "${DB_NAME}" | tr -d '\r')
   FILE_PATH="${BACKUP_DIR}/${CLEAN_DB_NAME}-${TIMESTAMP}.sql.gz"
 
-  echo "Iniciando backup do banco de dados '${CLEAN_DB_NAME}' para '${FILE_PATH}'..."
+  echo "Backing up database '${CLEAN_DB_NAME}' to '${FILE_PATH}'..."
 
-  # Executa o pg_dump dentro do container e canaliza (pipe) a saída para o gzip no host.
-  # A saída do gzip é então redirecionada para o arquivo de backup no host.
-  docker exec "${CONTAINER_NAME}" pg_dump -U "${POSTGRES_USER}" -d "${CLEAN_DB_NAME}" | gzip > "${FILE_PATH}"
+  # Execute pg_dump inside the container, pipe the output to gzip on the host.
+  # The output of gzip is then redirected to the backup file on the host.
+  docker exec "${POSTGRES_CONTAINER_NAME}" pg_dump -U "${POSTGRES_USER}" -d "${CLEAN_DB_NAME}" | gzip > "${FILE_PATH}"
 
-  # Verifica o status de saída do comando pg_dump (o primeiro comando no pipe).
-  # ${PIPESTATUS[0]} é uma variável especial do Bash que contém o código de saída do primeiro comando em um pipe.
+  # Check the exit status of the pg_dump command (the first command in the pipe).
+  # ${PIPESTATUS[0]} is a special Bash variable that holds the exit code of the first command in a pipeline.
   if [ ${PIPESTATUS[0]} -eq 0 ]; then
-    echo "[SUCESSO] Backup do banco de dados '${CLEAN_DB_NAME}' concluído com sucesso."
+    echo "[SUCCESS] Backup of database '${CLEAN_DB_NAME}' completed successfully."
   else
-    echo "[FALHA] Ocorreu um erro durante o backup do banco de dados '${CLEAN_DB_NAME}'. Removendo arquivo parcial."
-    # Remove o arquivo de backup que pode ter sido criado parcialmente.
+    echo "[FAILURE] An error occurred during the backup of database '${CLEAN_DB_NAME}'. Removing partial file."
+    # Remove the backup file that may have been partially created.
     rm -f "${FILE_PATH}"
     exit 1
   fi
   echo "----------------------------------------"
 done
 
-echo "--- Processo de backup finalizado. ---"
+echo "--- Backup process finished. ---"
+
