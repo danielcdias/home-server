@@ -131,11 +131,70 @@ The self-signed certificates generated during installation need to be trusted on
 
 ### Backup Recommendations
 
-Regularly backup:
+Regularly backing up your PostgreSQL databases is critical. This project includes a `backup-db.sh` script to automate this process. It is designed to be run from your installation directory (e.g., `/opt/home-server`).
 
-- PostgreSQL databases using `pg_dump`.
-- Docker volumes containing application data (e.g., `mongo-data`, `postgres_data`).
-- The installation directory, which contains your configuration files (`config.env`, `.env`, etc.).
+**Configuration**
+
+The script reads its configuration from the project's main `.env` file. Before running it, ensure the following variables are correctly set in your `.env` file:
+
+```dotenv
+# .env - main configuration file
+# ... other secrets ...
+
+# --- Backup Script Variables ---
+# Name of the PostgreSQL container defined in docker-compose.yml
+POSTGRES_CONTAINER_NAME=postgres
+
+# PostgreSQL superuser (must have access to all databases)
+POSTGRES_USER=postgres
+```
+
+**Usage**
+
+1. Make the script executable (if not):
+
+   Before the first run, you must grant execute permissions to the script. Navigate to your installation directory and run:
+
+   ```bash
+   cd /opt/home-server
+   sudo chmod +x backup-db.sh
+   ```
+
+2. Run the manual backup:
+
+   To perform a backup manually, execute the script with `sudo`:
+
+   ```bash
+   sudo ./backup-db.sh
+   ```
+   
+   Backup files will be saved to the `/var/backups/pg_container` directory on your host machine.
+
+**Automating with Cron**
+
+You can schedule automatic backups using cron.
+
+1. Edit the root user's crontab:
+
+   ```bash
+   sudo crontab -e
+   ```
+
+2. Add one of the following lines to schedule the task.
+
+   * **Daily Backup**: To run the backup every day at 2:30 AM.
+   
+   ```bash
+   30 2 * * * /opt/home-server/backup-db.sh >> /var/log/postgres_backup.log 2>&1
+   ```
+
+   * **Weekly Backup**: To run the backup every Sunday at 3:00 AM.
+
+   ```bash
+   0 3 * * 0 /opt/home-server/backup-db.sh >> /var/log/postgres_backup.log 2>&1
+   ```
+
+   This command executes the script and appends all output (including errors) to a log file, which is useful for troubleshooting.
 
 ### Uninstallation
 
