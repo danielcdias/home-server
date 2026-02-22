@@ -19,8 +19,8 @@ log_error() { echo -e "${RED}[ERROR]${NC} $1"; }
 show_usage() {
     echo "Usage: $0 --path PROJECT_PATH --hostname HOSTNAME --domain-suffix SUFFIX [--webmin true|false] [--ip IP_ADDRESS]"
     echo "Required arguments:"
-    echo "   --path PROJECT_PATH         Base installation directory (e.g., /opt/homeserver)."
-    echo "   --hostname HOSTNAME         Hostname (e.g., homeserver)."
+    echo "   --path PROJECT_PATH        Base installation directory (e.g., /opt/homeserver)."
+    echo "   --hostname HOSTNAME        Hostname (e.g., homeserver)."
     echo "   --domain-suffix SUFFIX      Domain suffix (e.g., lan)."
     echo ""
     echo "Optional arguments:"

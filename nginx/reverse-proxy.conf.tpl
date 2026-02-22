@@ -139,3 +139,33 @@ server {
         proxy_redirect http://$host:10000/ https://$host/;
     }
 }
+
+# Proxy para o Home-Services (services.${SERVER_HOSTNAME}.${DOMAIN_SUFFIX})
+server {
+    listen 443 ssl;
+    server_name services.${SERVER_HOSTNAME};
+    
+    ssl_certificate /etc/nginx/ssl/${SERVER_HOSTNAME}.crt;
+    ssl_certificate_key /etc/nginx/ssl/${SERVER_HOSTNAME}.key;
+    
+    ssl_protocols TLSv1.2 TLSv1.3;
+    ssl_ciphers ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-GCM-SHA384;
+    ssl_prefer_server_ciphers off;
+
+    resolver 127.0.0.11 valid=30s;
+    
+    set $upstream_django "http://hs_django:8000";
+
+    location / {
+        proxy_pass $upstream_django;
+        
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
+    }
+}
