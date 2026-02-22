@@ -112,7 +112,6 @@ services:
       FTLCONF_dns_listeningMode: 'all'
       FTLCONF_misc_etc_dnsmasq_d: 'true'
       FTLCONF_misc_dnsmasq_lines: "address=/${SERVER_HOSTNAME:-homeserver}/172.20.0.100"
-      PIHOLE_DNS_:   
     volumes:
       - ./runtime_config/etc-pihole:/etc/pihole
     networks:
