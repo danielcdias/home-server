@@ -97,6 +97,9 @@ services:
     container_name: pihole
     hostname: pihole
     image: pihole/pihole:latest
+    dns:
+      - 127.0.0.1
+      - 8.8.8.8
     ports:
       - "53:53/tcp"
       - "53:53/udp"
@@ -109,6 +112,7 @@ services:
       FTLCONF_dns_listeningMode: 'all'
       FTLCONF_misc_etc_dnsmasq_d: 'true'
       FTLCONF_misc_dnsmasq_lines: "address=/${SERVER_HOSTNAME:-homeserver}/172.20.0.100"
+      PIHOLE_DNS_:   
     volumes:
       - ./runtime_config/etc-pihole:/etc/pihole
     networks:
