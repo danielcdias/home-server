@@ -195,6 +195,8 @@ main() {
     SAN_ARRAY+=("DNS:ha.$SERVER_HOSTNAME.$DOMAIN_SUFFIX")
     SAN_ARRAY+=("DNS:komodo.$SERVER_HOSTNAME")
     SAN_ARRAY+=("DNS:komodo.$SERVER_HOSTNAME.$DOMAIN_SUFFIX")
+    SAN_ARRAY+=("DNS:services.$SERVER_HOSTNAME")
+    SAN_ARRAY+=("DNS:services.$SERVER_HOSTNAME.$DOMAIN_SUFFIX")
 
     if [[ "$ENABLE_WEBMIN" == "true" ]]; then
         SAN_ARRAY+=("DNS:webmin.$SERVER_HOSTNAME")
