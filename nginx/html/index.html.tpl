@@ -26,7 +26,7 @@
 
         <main class="container">
             <ul>
-                <li><a class="service-link" href="https://services.{{SERVER_HOSTNAME}}/admin/" target="_blank">Services</a></li>
+                <li><a class="service-link" href="https://services.{{SERVER_HOSTNAME}}" target="_blank">Services</a></li>
                 <li><a class="service-link" href="https://pihole.{{SERVER_HOSTNAME}}/admin/" target="_blank">Pi-hole</a></li>
                 <li><a class="service-link" href="https://ha.{{SERVER_HOSTNAME}}" target="_blank">Home Assistant</a></li>
                 <li><a class="service-link" href="https://komodo.{{SERVER_HOSTNAME}}" target="_blank">Komodo</a></li>
