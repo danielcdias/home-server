@@ -114,6 +114,7 @@ services:
       FTLCONF_misc_dnsmasq_lines: "address=/${SERVER_HOSTNAME:-homeserver}/172.20.0.100"
     volumes:
       - ./runtime_config/etc-pihole:/etc/pihole
+      - ./pi-hole/05-wildcard.conf:/etc/dnsmasq.d/05-wildcard.conf:ro
     networks:
       public_web:
         ipv4_address: 172.20.0.20
