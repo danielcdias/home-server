@@ -1,7 +1,7 @@
 access_log /dev/stdout;
 error_log /dev/stderr notice;
 
-# Redirecionamento HTTP para HTTPS
+# Redirecionamento HTTP para HTTPS (Mantido Intacto)
 server {
     listen 80;
     server_name ${SERVER_HOSTNAME} ~.${SERVER_HOSTNAME};
@@ -10,7 +10,7 @@ server {
     return 301 https://$host$request_uri;
 }
 
-# Servidor HTTPS para a página inicial
+# Servidor Principal: Agora é o Home-Services (Django) assumindo a Raiz!
 server {
     listen 443 ssl;
     server_name ${SERVER_HOSTNAME};
@@ -24,15 +24,24 @@ server {
     ssl_ciphers ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-GCM-SHA384;
     ssl_prefer_server_ciphers off;
 
-    root /var/www/html;
-    index index.html;
+    # DNS interno do Docker (permite descobrir o IP do hs_django dinamicamente)
+    resolver 127.0.0.11 valid=30s;
 
-    # Bloco para servir o favicon.ico de forma eficiente
-    # location = /img/favicon.ico {
-    #     log_not_found off; # Não registrar erros se o arquivo não for encontrado
-    #     access_log off;    # Não registrar acessos para este arquivo
-    #     expires 7d;        # Instruir o navegador a manter o ícone em cache por 1 ano
-    # }
+    # O NGINX repassa tudo da raiz diretamente para o container do Django
+    location / {
+        # Uso de variável para forçar a resolução de DNS em tempo real
+        set $upstream_django "http://hs_django:8000";
+        proxy_pass $upstream_django;
+        
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
+    }
 }
 
 # Proxy para o Pi-hole (pihole.${SERVER_HOSTNAME}.${DOMAIN_SUFFIX})
@@ -137,35 +146,5 @@ server {
         proxy_set_header Connection "upgrade";
         
         proxy_redirect http://$host:10000/ https://$host/;
-    }
-}
-
-# Proxy para o Home-Services (services.${SERVER_HOSTNAME}.${DOMAIN_SUFFIX})
-server {
-    listen 443 ssl;
-    server_name services.${SERVER_HOSTNAME};
-    
-    ssl_certificate /etc/nginx/ssl/${SERVER_HOSTNAME}.crt;
-    ssl_certificate_key /etc/nginx/ssl/${SERVER_HOSTNAME}.key;
-    
-    ssl_protocols TLSv1.2 TLSv1.3;
-    ssl_ciphers ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-GCM-SHA384;
-    ssl_prefer_server_ciphers off;
-
-    resolver 127.0.0.11 valid=30s;
-    
-    set $upstream_django "http://hs_django:8000";
-
-    location / {
-        proxy_pass $upstream_django;
-        
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
-        
-        proxy_http_version 1.1;
-        proxy_set_header Upgrade $http_upgrade;
-        proxy_set_header Connection "upgrade";
     }
 }
